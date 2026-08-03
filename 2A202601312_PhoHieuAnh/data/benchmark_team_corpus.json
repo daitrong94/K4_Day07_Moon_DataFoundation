@@ -1,0 +1,50 @@
+{
+  "description": "5 benchmark query cho CORPUS CỦA TEAM (data/team_k4_corpus, Shopee/Tiki). Đặt ngoài thư mục team để không trộn file của họ. Mục đích: chạy CÙNG harness và CÙNG 5 chiến lược chunking như benchmark corpus của tôi, để xem kết luận 'policy_contextual thắng' có tổng quát sang corpus khác hay không.",
+  "queries": [
+    {
+      "id": 1,
+      "query": "Người mua có bao nhiêu ngày để gửi yêu cầu trả hàng hoàn tiền?",
+      "gold_answer": "15 ngày kể từ khi đơn hàng được giao thành công (riêng thực phẩm tươi sống và đông lạnh là 24 giờ).",
+      "gold_doc_ids": ["shopee-return-refund-policy"],
+      "gold_keywords": ["15 ngày", "24 giờ"],
+      "metadata_filter": null,
+      "note": "Đối ứng với Q1 corpus của tôi: hỏi mốc thời hạn đổi trả."
+    },
+    {
+      "id": 2,
+      "query": "Thanh toán bằng Apple Pay bị giới hạn giá trị đơn hàng bao nhiêu?",
+      "gold_answer": "Từ 10.000 VNĐ đến 25.000.000 VNĐ; không áp dụng cho Nạp thẻ & Dịch vụ, 'Người bán tự vận chuyển' và ShopeeFood.",
+      "gold_doc_ids": ["shopee-payment-methods"],
+      "gold_keywords": ["25.000.000", "Apple Pay"],
+      "metadata_filter": null,
+      "note": "Con số cụ thể nằm trong danh sách 9 phương thức thanh toán — dễ bị lẫn với Google Pay (120.000.000)."
+    },
+    {
+      "id": 3,
+      "query": "Đơn hàng giá trị bao nhiêu thì không được hỗ trợ vận chuyển?",
+      "gold_answer": "Đơn hàng có giá trị vượt quá 50.000.000 VNĐ không được hỗ trợ vận chuyển.",
+      "gold_doc_ids": ["shopee-shipping-policy"],
+      "gold_keywords": ["50.000.000"],
+      "metadata_filter": null,
+      "note": "Khác chủ đề (vận chuyển) để bộ câu hỏi đa dạng."
+    },
+    {
+      "id": 4,
+      "query": "Người bán vi phạm chính sách hàng cấm thì bị xử lý như thế nào?",
+      "gold_answer": "Xóa sản phẩm vi phạm, giới hạn quyền hạn hoặc đình chỉ tài khoản, cấn trừ số dư tài khoản, và có thể bị xử phạt hành chính hoặc truy cứu trách nhiệm hình sự.",
+      "gold_doc_ids": ["shopee-prohibited-products-policy"],
+      "gold_keywords": ["đình chỉ tài khoản", "cấn trừ số dư"],
+      "metadata_filter": {"customer_role": "seller"},
+      "note": "Câu BẮT BUỘC dùng metadata filter theo K4 — và ở corpus này lọc được đúng `seller`, điều corpus của tôi không làm được vì không có tài liệu seller nào."
+    },
+    {
+      "id": 5,
+      "query": "Nhà bán hàng bị cấm những hành vi gian lận nào?",
+      "gold_answer": "Lạm dụng chương trình khuyến mãi, tự đặt đơn và tự đánh giá sản phẩm của chính mình, tạo nhiều tài khoản để lạm dụng chương trình.",
+      "gold_doc_ids": ["tiki-seller-rights-obligations"],
+      "gold_keywords": ["tự đặt đơn", "lạm dụng"],
+      "metadata_filter": null,
+      "note": "Tài liệu Tiki, trong khi 6/8 tài liệu còn lại là Shopee — kiểm tra retrieval có bị lệch về nguồn chiếm đa số không."
+    }
+  ]
+}

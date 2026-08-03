@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0",
+  "corpus": "K4 — chính sách TMĐT / hỗ trợ khách hàng (bán lẻ điện máy trực tuyến)",
+  "note": "Schema này được ÉP bằng scripts/validate_metadata.py, không phải mô tả suông. Mọi tài liệu trong data/k4_ecommerce/*.md phải qua validator trước khi chạy benchmark.",
+  "fields": {
+    "doc_id": {
+      "type": "slug",
+      "required": true,
+      "unique": true,
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "purpose": "Khóa của tài liệu. delete_document() xóa theo trường này và Hit@3 chấm theo nó."
+    },
+    "title": {
+      "type": "string",
+      "required": true,
+      "purpose": "Đưa vào tiền tố ngữ cảnh của mỗi chunk (contextual retrieval)."
+    },
+    "source_url": {
+      "type": "url",
+      "required": true,
+      "pattern": "^https://",
+      "purpose": "Truy vết câu trả lời về trang gốc. Bắt buộc theo K4_VARIANT.md."
+    },
+    "retrieved_at": {
+      "type": "date",
+      "required": true,
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "purpose": "Ngày crawl. Bắt buộc theo K4_VARIANT.md."
+    },
+    "document_version": {
+      "type": "string",
+      "required": true,
+      "purpose": "Ngày hiệu lực do CHÍNH trang công bố, dạng YYYY-MM-DD; 'not-stated' nếu trang không nêu. Bắt buộc theo K4_VARIANT.md.",
+      "pattern": "^(\\d{4}-\\d{2}-\\d{2}|not-stated)$"
+    },
+    "customer_role": {
+      "type": "enum",
+      "required": true,
+      "values": ["buyer", "seller", "both"],
+      "purpose": "Trường lọc BẮT BUỘC của K4. Corpus này là nhà bán lẻ (không phải sàn nhiều người bán) nên chỉ sinh ra buyer/both; tài liệu 'quy chế hoạt động' mang cả nghĩa vụ bên bán nên gán 'both'."
+    },
+    "category": {
+      "type": "enum",
+      "required": true,
+      "values": ["returns", "warranty", "shipping", "payment", "privacy", "platform-rules"],
+      "purpose": "Trường hữu ích thứ hai theo yêu cầu K4. Ngăn câu hỏi giao hàng bị kéo về tài liệu đổi trả."
+    },
+    "retailer": {
+      "type": "enum",
+      "required": true,
+      "values": ["cellphones", "didongviet", "hoanghamobile"],
+      "purpose": "Trường hữu ích thứ ba. Câu hỏi thường nêu đích danh thương hiệu ('tại Hoàng Hà Mobile') — lọc theo trường này loại hẳn chính sách của hai bên còn lại, vốn nói cùng chủ đề với con số khác."
+    },
+    "language": {
+      "type": "enum",
+      "required": true,
+      "values": ["vi", "en"],
+      "purpose": "Corpus thuần tiếng Việt; giữ trường này để mở rộng song ngữ mà không phải đổi schema."
+    },
+    "chunk_index": {
+      "type": "int",
+      "required": false,
+      "added_by": "ingest.chunk_document / src.custom_chunking.contextual_chunk_document",
+      "purpose": "Thứ tự chunk trong tài liệu, để đọc lại ngữ cảnh liền kề."
+    },
+    "source": {
+      "type": "path",
+      "required": false,
+      "added_by": "ingest.load_documents",
+      "purpose": "Đường dẫn file trên đĩa."
+    }
+  }
+}

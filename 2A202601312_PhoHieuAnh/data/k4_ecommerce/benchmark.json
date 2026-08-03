@@ -1,0 +1,50 @@
+{
+  "description": "5 benchmark query cho corpus chính sách TMĐT K4. gold_doc_ids = tài liệu chứa câu trả lời; gold_keywords = chuỗi phải xuất hiện trong chunk thì chunk mới được tính là grounding được gold answer.",
+  "queries": [
+    {
+      "id": 1,
+      "query": "Điện thoại mua mới được đổi sang máy khác trong bao nhiêu ngày?",
+      "gold_answer": "30 ngày — thời gian đổi mới tiêu chuẩn cho nhóm Điện thoại/Máy tính bảng/Macbook tại CellphoneS.",
+      "gold_doc_ids": ["cps-chinh-sach-doi-tra", "cps-huy-giao-dich-doi-tra", "cps-quy-che-hoat-dong"],
+      "gold_keywords": ["30 ngày"],
+      "metadata_filter": null,
+      "note": "Câu hỏi 'dễ' — kiểm tra baseline. Bảng bị làm phẳng khi crawl nên quan hệ hàng-cột dễ đứt."
+    },
+    {
+      "id": 2,
+      "query": "Nhập lại máy trong 15 ngày đầu tại Hoàng Hà Mobile bị trừ bao nhiêu phần trăm giá?",
+      "gold_answer": "Trừ phí 15% trên giá hiện tại (hoặc giá tại thời điểm mua) khi nhập lại máy trong 15 ngày đầu.",
+      "gold_doc_ids": ["hhm-bao-xai-doi-tra-15-ngay"],
+      "gold_keywords": ["15%"],
+      "metadata_filter": {"retailer": "hoanghamobile"},
+      "note": "Số liệu cụ thể, cần đúng chunk chứa mức phí chứ không chỉ đúng tài liệu. Dùng filter `retailer` vì cả ba nhà bán lẻ đều có mức phí nhập lại nhưng con số khác nhau — không lọc thì rất dễ trả về đúng chủ đề nhưng sai thương hiệu."
+    },
+    {
+      "id": 3,
+      "query": "Đơn hàng ở khoảng cách xa hơn 10km thì bao lâu được giao tới?",
+      "gold_answer": "Nội thành HCM/Hà Nội: trong vòng 24-48 giờ cho khoảng cách xa hơn 10km (1-2 giờ nếu ≤10km). Các khu vực còn lại: 1-2 ngày khi >10km, nội tỉnh/liên tỉnh 2-5 ngày.",
+      "gold_doc_ids": ["cps-chinh-sach-giao-hang"],
+      "gold_keywords": ["24 - 48 giờ", "24-48 giờ", "10km"],
+      "metadata_filter": null,
+      "note": "Khác chủ đề với 4 câu còn lại (giao hàng thay vì đổi trả) để bộ câu hỏi đa dạng."
+    },
+    {
+      "id": 4,
+      "query": "Máy chưa khui seal và chưa kích hoạt thì được đổi trả miễn phí trong bao lâu?",
+      "gold_answer": "7 ngày đầu tiên — Di Động Việt đổi trả miễn phí với máy chưa khui seal và chưa kích hoạt.",
+      "gold_doc_ids": ["ddv-bao-hanh-doi-tra-may-moi", "ddv-bao-hanh-doi-tra-may-cu"],
+      "gold_keywords": ["7 ngày đầu tiên", "chưa khui seal"],
+      "metadata_filter": null,
+      "note": "Diễn đạt trong câu hỏi gần sát tài liệu — dùng để đối chiếu với câu 5 (diễn đạt lệch)."
+    },
+    {
+      "id": 5,
+      "query": "Khách hàng muốn hủy đơn hàng đã đặt online thì phải làm gì?",
+      "gold_answer": "Gọi tổng đài 1800.2097 (Miền Nam) / 1800.2044 (Miền Bắc) hoặc email, hoặc từ chối nhận hàng khi bên vận chuyển giao.",
+      "gold_doc_ids": ["cps-huy-giao-dich-doi-tra", "cps-chinh-sach-doi-tra"],
+      "gold_keywords": ["1800.2097", "1800.2044", "Từ chối nhận hàng"],
+      "metadata_filter": {"customer_role": "buyer"},
+      "note": "Câu BẮT BUỘC dùng metadata filter theo yêu cầu K4. Không lọc thì tài liệu 'quy chế hoạt động' (29KB, customer_role=both) sinh rất nhiều chunk nhiễu chứa cùng từ khóa."
+    }
+  ]
+}
