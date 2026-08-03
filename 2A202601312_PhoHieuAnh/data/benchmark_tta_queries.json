@@ -1,0 +1,50 @@
+{
+  "description": "5 benchmark query LẤY TỪ NHÁNH 2a202601086-TranTuanAnh (Bench.py > BENCHMARK_QUERIES), chuyển sang format harness của tôi để chạy được cả 5 chiến lược chunking. Query, gold_answer và metadata_filter giữ NGUYÊN VĂN của bạn ấy; chỉ đổi tên trường target_doc_id -> gold_doc_ids và bổ sung gold_keywords (trích từ chính corpus) để đo thêm Grounded@3.",
+  "corpus": "data/team_k4_corpus (bản sao data/k4_ecommerce của repo nhóm, 8 tài liệu Shopee/Tiki)",
+  "corrections": [
+    "Q4: target_doc_id gốc là 'k4-prohibited-products' — doc_id này KHÔNG tồn tại trong corpus (id thật: 'shopee-prohibited-products-policy'). Giữ nguyên sẽ khiến Q4 luôn 0 điểm với mọi chiến lược, không phản ánh chất lượng truy xuất. Tôi chạy cả hai phiên bản và báo cáo cả hai."
+  ],
+  "queries": [
+    {
+      "id": 1,
+      "query": "Thời hạn gửi yêu cầu trả hàng/hoàn tiền đối với đơn hàng giao thành công thông thường là bao nhiêu ngày?",
+      "gold_answer": "15 ngày kể từ khi đơn hàng được giao thành công (riêng thực phẩm tươi sống/đông lạnh là 24 giờ).",
+      "gold_doc_ids": ["shopee-return-refund-policy"],
+      "gold_keywords": ["15 ngày", "24 giờ"],
+      "metadata_filter": null
+    },
+    {
+      "id": 2,
+      "query": "Nhà bán trên Tiki bị xử lý như thế nào nếu thực hiện các hành vi gian lận như tự đặt đơn hoặc lôi kéo khách giao dịch ngoài sàn?",
+      "gold_answer": "Nhà Bán bị ngưng hợp tác kinh doanh vĩnh viễn, thu hồi giá trị khuyến mãi lạm dụng, hủy đơn/nhận xét gian lận, và phong tỏa sao kê trong 90 ngày.",
+      "gold_doc_ids": ["tiki-seller-rights-obligations"],
+      "gold_keywords": ["vĩnh viễn", "90 ngày"],
+      "metadata_filter": {"customer_role": "seller"}
+    },
+    {
+      "id": 3,
+      "query": "Shopee hỗ trợ những phương thức thanh toán chính nào và hạn mức điều kiện đối với Apple Pay là bao nhiêu?",
+      "gold_answer": "Shopee hỗ trợ 9 hình thức thanh toán chính. Đối với Apple Pay, hạn mức giao dịch quy định từ 10.000 VNĐ đến 25.000.000 VNĐ.",
+      "gold_doc_ids": ["shopee-payment-methods"],
+      "gold_keywords": ["25.000.000", "apple pay"],
+      "metadata_filter": {"customer_role": "buyer"}
+    },
+    {
+      "id": 4,
+      "query": "Các loại hàng hóa cấm đăng bán hoặc kinh doanh trên sàn giao dịch thương mại điện tử bao gồm những loại nào?",
+      "gold_answer": "Bao gồm vũ khí, chất cháy nổ, hàng giả/hàng nhái, ma túy/chất kích thích, động vật hoang dã, thuốc lá/thuốc lá điện tử, và hàng hóa bị cấm theo quy định pháp luật.",
+      "gold_doc_ids": ["shopee-prohibited-products-policy"],
+      "gold_keywords": ["vũ khí", "ma túy"],
+      "metadata_filter": null,
+      "note": "gold_doc_ids đã SỬA từ 'k4-prohibited-products' (không tồn tại) sang id thật."
+    },
+    {
+      "id": 5,
+      "query": "Chính sách vận chuyển Shopee quy định thời gian xử lý khiếu nại đối với hư hỏng/mất mát hàng hóa tối đa là bao nhiêu ngày?",
+      "gold_answer": "Thời gian xử lý khiếu nại tối đa là 10 ngày làm việc kể từ khi nhận đủ thông tin và bằng chứng hợp lệ.",
+      "gold_doc_ids": ["shopee-shipping-policy"],
+      "gold_keywords": ["10 ngày làm việc"],
+      "metadata_filter": null
+    }
+  ]
+}

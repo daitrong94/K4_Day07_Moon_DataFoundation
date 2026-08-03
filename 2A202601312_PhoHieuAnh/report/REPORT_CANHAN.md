@@ -130,7 +130,50 @@ Chạy bằng `HF_HOME=./.hf-cache .venv/bin/python scripts/run_benchmark.py --s
 
 Điểm tự chấm theo `docs/SCORING.md`: Q2/Q4/Q5 được 2 điểm; Q1 và Q3 chỉ 1 điểm vì chunk liên quan **không ở top-1** → **8/10**.
 
+### Chạy bộ câu hỏi CHUNG của nhóm trên code của tôi
+
+`docs/SCORING.md` yêu cầu 5 câu hỏi phải trùng với các thành viên cùng nhóm. Bộ câu hỏi chung của nhóm nằm ở nhánh `2a202601086-TranTuanAnh`, file `Bench.py` → `BENCHMARK_QUERIES` (5 câu, trên corpus Shopee/Tiki `data/k4_ecommerce` của nhóm). Tôi chuyển nguyên văn sang format harness của mình (`data/benchmark_tta_queries.json` — giữ nguyên `query`, `gold_answer`, `metadata_filter`; chỉ đổi tên trường và bổ sung `gold_keywords` để đo thêm Grounded@3) rồi chạy bằng **code của tôi**:
+
+```bash
+.venv/bin/python scripts/run_benchmark.py \
+  --data-dir data/team_k4_corpus --benchmark data/benchmark_tta_queries.json
+```
+
+| # | Câu hỏi của nhóm | Top-1 doc_id | Score | Hit@3 | Grounded@3 |
+|---|---|---|---:|:---:|:---:|
+| 1 | Thời hạn gửi yêu cầu trả hàng/hoàn tiền…? | `shopee-return-refund-policy` | 0.518 | ✅ | ✅ |
+| 2 | Nhà bán Tiki bị xử lý thế nào nếu gian lận? | `tiki-seller-rights-obligations` | 0.512 | ✅ | ✅ |
+| 3 | Hạn mức Apple Pay trên Shopee là bao nhiêu? | `shopee-payment-methods` | 0.569 | ✅ | ✅ |
+| 4 | Hàng hóa cấm đăng bán gồm những loại nào? | `shopee-marketplace-rules` | 0.541 | ✅ | ✅ |
+| 5 | Thời gian xử lý khiếu nại vận chuyển tối đa? | `shopee-shipping-policy` | 0.579 | ✅ | ✅ |
+
+**5/5 câu có chunk liên quan trong top-3.** So sánh 5 chiến lược của tôi trên cùng bộ câu hỏi này:
+
+| Chiến lược | Hit@3 | MRR@3 | Grounded@3 |
+|---|---:|---:|---:|
+| `fixed_500_50` | 1.00 | 0.90 | 0.80 |
+| `sentences_3` | 1.00 | **1.00** | **0.40** |
+| `recursive_500` | 1.00 | 0.87 | 0.80 |
+| `policy_sections` | 1.00 | 0.87 | 0.60 |
+| **`policy_contextual`** | 1.00 | 0.90 | **1.00** |
+
+Kết quả củng cố kết luận ở báo cáo nhóm: mọi chiến lược đều tìm **đúng tài liệu** (Hit@3 = 1.00), nhưng chỉ `policy_contextual` luôn lấy **đúng đoạn chứa dữ kiện** (Grounded@3 = 1.00). `sentences_3` có MRR cao nhất (1.00 — luôn xếp tài liệu đúng lên hạng 1) nhưng Grounded thấp nhất (0.40) — một minh họa rõ rằng **MRR và Grounded đo hai thứ khác nhau**, và nếu chỉ nhìn Hit@1/Hit@3 như `Bench.py` của nhóm thì không thấy được khác biệt này.
+
+**Một lỗi tôi phát hiện trong bộ câu hỏi chung:** Q4 khai `target_doc_id = "k4-prohibited-products"`, nhưng corpus không có `doc_id` nào như vậy — id thật là `shopee-prohibited-products-policy`. Giữ nguyên thì Q4 luôn bị chấm 0 với mọi chiến lược, kéo Hit@3 của cả nhóm từ 1.00 xuống 0.80 một cách giả tạo:
+
+| Bộ câu hỏi | Hit@3 (`policy_contextual`) |
+|---|---:|
+| Giữ nguyên `k4-prohibited-products` | 0.80 |
+| Sửa thành `shopee-prohibited-products-policy` | **1.00** |
+
+Đã báo lại cho nhóm để sửa `Bench.py`. Đây cũng là lý do tôi thêm `scripts/validate_metadata.py`: nếu `doc_id` trong bộ benchmark được đối chiếu tự động với corpus thì lỗi này lộ ra ngay.
+
 **Điều hay nhất tôi học được từ thành viên khác / nhóm khác (qua demo):**
+
+> **Từ `Bench.py` của Trần Tuấn Anh:** bạn ấy đo **Hit@1** bên cạnh Hit@3 — một chỉ số tôi đã bỏ qua. Hit@1 quan trọng thật, vì trong RAG thực tế chunk hạng 1 chiếm phần lớn ngữ cảnh đưa vào prompt; Hit@3 = 1.00 mà chunk đúng nằm hạng 3 thì agent vẫn dễ trả lời sai. Cách bạn ấy viết câu hỏi cũng dài và tự nhiên hơn của tôi (*"…thời gian xử lý khiếu nại đối với hư hỏng/mất mát hàng hóa tối đa là bao nhiêu ngày?"* thay vì câu cụt lủn), sát với cách người dùng thật gõ vào ô tìm kiếm hơn.
+>
+> Ngược lại, chạy bộ câu hỏi của bạn ấy bằng harness của tôi cho thấy Hit@1/Hit@3 **chưa đủ**: cả 5 chiến lược đều Hit@3 = 1.00, nhìn vào thì tưởng chiến lược nào cũng như nhau, trong khi Grounded@3 dao động từ 0.40 đến 1.00. Kết hợp cả hai — Hit@1 của bạn ấy và Grounded@3 của tôi — mới đủ để kết luận.
+
 > Việc so sánh 5 chiến lược trên **cùng** corpus cho thấy điều mà chạy riêng một chiến lược không bao giờ thấy được: `recursive_500` — chiến lược được coi là mặc định tốt nhất trong hầu hết tài liệu về RAG — lại có Grounded@3 **thấp nhất** trên corpus này (0.80). Lý do rất cụ thể: tài liệu của nhóm có nhiều bảng bị làm phẳng khi crawl, và recursive cắt theo đoạn văn nên tách mức phí khỏi tên nhóm sản phẩm. Bài học tôi rút ra là **đừng chọn chiến lược theo danh tiếng, hãy chọn theo cấu trúc thật của tài liệu** — và muốn biết cấu trúc thật thì phải mở file crawl ra đọc, chứ không đọc mỗi số liệu tổng hợp.
 
 ---

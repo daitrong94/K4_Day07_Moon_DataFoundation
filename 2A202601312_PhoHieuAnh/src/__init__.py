@@ -11,6 +11,7 @@ from .custom_chunking import (
     build_context_prefix,
     contextual_chunk_document,
 )
+from .hybrid import BM25Index, HybridStore, reciprocal_rank_fusion, tokenize
 from .embeddings import (
     EMBEDDING_PROVIDER_ENV,
     LOCAL_EMBEDDING_MODEL,
@@ -34,6 +35,10 @@ __all__ = [
     "contextual_chunk_document",
     "compute_similarity",
     "EmbeddingStore",
+    "HybridStore",
+    "BM25Index",
+    "reciprocal_rank_fusion",
+    "tokenize",
     "KnowledgeBaseAgent",
     "MockEmbedder",
     "LocalEmbedder",

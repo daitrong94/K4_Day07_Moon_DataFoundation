@@ -32,18 +32,21 @@ from src import (  # noqa: E402
     KnowledgeBaseAgent,
     PolicySectionChunker,
     RecursiveChunker,
+    HybridStore,
     SentenceChunker,
     contextual_chunk_document,
 )
 
 TOP_K = 3
 
+# (chunker, có gắn tiền tố ngữ cảnh?, có bật hybrid BM25+RRF?)
 STRATEGIES = {
-    "fixed_500_50": (FixedSizeChunker(chunk_size=500, overlap=50), False),
-    "sentences_3": (SentenceChunker(max_sentences_per_chunk=3), False),
-    "recursive_500": (RecursiveChunker(chunk_size=500), False),
-    "policy_sections": (PolicySectionChunker(chunk_size=500), False),
-    "policy_contextual": (PolicySectionChunker(chunk_size=500), True),
+    "fixed_500_50": (FixedSizeChunker(chunk_size=500, overlap=50), False, False),
+    "sentences_3": (SentenceChunker(max_sentences_per_chunk=3), False, False),
+    "recursive_500": (RecursiveChunker(chunk_size=500), False, False),
+    "policy_sections": (PolicySectionChunker(chunk_size=500), False, False),
+    "policy_contextual": (PolicySectionChunker(chunk_size=500), True, False),
+    "policy_contextual_hybrid": (PolicySectionChunker(chunk_size=500), True, True),
 }
 
 
@@ -51,12 +54,14 @@ def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip().lower()
 
 
-def build_store(data_dir: Path, chunker, contextual: bool, embedding_fn) -> EmbeddingStore:
+def build_store(data_dir: Path, chunker, contextual: bool, embedding_fn, hybrid: bool = False):
     builder = contextual_chunk_document if contextual else chunk_document
     chunk_docs = []
     for doc in load_documents(data_dir):
         chunk_docs.extend(builder(doc, chunker))
     store = EmbeddingStore(collection_name="benchmark", embedding_fn=embedding_fn)
+    if hybrid:
+        store = HybridStore(store)
     store.add_documents(chunk_docs)
     return store
 
@@ -108,10 +113,11 @@ def main() -> int:
     print("## Chiến lược chia nhỏ\n")
     print("| Chiến lược | Số chunk | Độ dài TB |")
     print("|---|---:|---:|")
-    for name, (chunker, contextual) in STRATEGIES.items():
-        store = build_store(args.data_dir, chunker, contextual, embedder)
+    for name, (chunker, contextual, hybrid) in STRATEGIES.items():
+        store = build_store(args.data_dir, chunker, contextual, embedder, hybrid)
         stores[name] = store
-        lengths = [len(record["content"]) for record in store._store]
+        records = store._records if hasattr(store, "_records") else store._store
+        lengths = [len(record["content"]) for record in records]
         print(f"| `{name}` | {len(lengths)} | {mean([float(x) for x in lengths]):.0f} |")
 
     print("\n## Chất lượng truy xuất (top-3)\n")

@@ -170,6 +170,35 @@ Hai điều corpus thứ hai làm lộ ra mà corpus thứ nhất không thấy 
 
 **a) Corpus dễ khiến mọi chiến lược trông như nhau.** Ở corpus B, cả 5 chiến lược đều Hit@3 = MRR@3 = **1.00** — không phân biệt được gì. Lý do: 8 tài liệu ngắn, mỗi tài liệu một chủ đề tách bạch, mỗi câu hỏi ứng đúng một tài liệu, không có nguồn gây nhiễu. Corpus A phân biệt được vì có **3 nhà bán lẻ nói cùng chủ đề với số liệu khác nhau** cộng một tài liệu 29KB gần trùng lặp. Bài học phương pháp: muốn benchmark có sức phân biệt thì corpus phải có nhiễu thật, không phải càng sạch càng tốt.
 
+**b') Thử nghiệm bổ sung: hybrid BM25 + RRF — một kết quả ÂM có ích.**
+
+Tài liệu về RAG production khuyến nghị hợp nhất BM25 (từ vựng) với dense (ngữ nghĩa) bằng Reciprocal Rank Fusion, báo cáo +7,4% NDCG trên benchmark TMĐT. Nhóm cài đặt đầy đủ bằng thư viện chuẩn (`src/hybrid.py`, 28 unit test ở `tests/test_hybrid.py`) và đo qua **ba vòng lặp**:
+
+| Vòng | Thiết kế | Corpus A | Corpus B (câu hỏi nhóm) |
+|---|---|:---:|:---:|
+| — | `policy_contextual` (baseline) | 1.00 / 0.87 / 1.00 | 1.00 / 0.90 / 1.00 |
+| v1 | RRF ngang quyền dense–BM25 | **0.80 / 0.80** / 1.00 | **0.80 / 0.80** / 1.00 |
+| v2 | + cổng chặn theo tần suất tài liệu | 0.80 / 0.80 / 1.00 | 0.80 / 0.80 / 1.00 |
+| v3 | + cổng chỉ mở cho token chứa chữ số | **1.00 / 0.87 / 1.00** | **1.00 / 0.90 / 1.00** |
+
+*(ô ghi Hit@3 / MRR@3 / Grounded@3)*
+
+**v1 làm TỆ ĐI.** Nguyên nhân đo được, không phải phỏng đoán: câu hỏi Q1 *"Điện thoại mua mới được đổi **sang** máy khác trong bao nhiêu ngày?"* — âm tiết `sang` chỉ xuất hiện ở **5/279 chunk**, tức "hiếm" theo mọi ngưỡng thống kê, nên BM25 chấm điểm cao cho các chunk chứa nó. Nhưng `sang` là **hư từ**, không mang thông tin truy xuất. Tiếng Việt tách theo âm tiết khiến hư từ trông y hệt thuật ngữ chuyên ngành — đúng vấn đề mà word segmentation (underthesea/VnCoreNLP) sinh ra để giải quyết.
+
+**v3 sửa được bằng cách thu hẹp phạm vi:** chỉ cho BM25 tham gia khi truy vấn chứa token **có chữ số** — vì các trường hợp dense thật sự mù đều là số (`10km`, `50.000.000`, `15%`, `1800.2097`). Sau đó hybrid **bằng đúng** baseline ở cả ba cấu hình: không hại, nhưng cũng **không lợi**.
+
+**Vì sao không lợi — và đây mới là điều đáng học:** ca lỗi Q3 mà nhóm kỳ vọng hybrid sẽ cứu lại nằm ngoài tầm với của BM25. Corpus có đúng 3 chunk chứa `10km`, và **cả chunk đúng lẫn hai chunk sai đều chứa nó**:
+
+```
+=< 10km  ... bán kính =< 10km (ngoại trừ các Huyện Cần Giờ, Củ Chi...)
+=< 10km  ... bán kính =< 10km, ngoại trừ các huyện Chương Mỹ, Đan Phượng...
+ > 10km  ... Trong vòng 1 - 2 ngày (Khoảng cách >10km)
+```
+
+Token phân biệt không phải `10km` mà là **toán tử so sánh `=<` vs `>`** — thứ mà cả embedding lẫn BM25 đều không mã hóa được. Chỉ **cross-encoder reranker**, vốn đọc cặp (câu hỏi, chunk) cùng lúc thay vì mã hóa độc lập, mới phân biệt được chiều so sánh. Đó là hướng đi tiếp theo, ngoài phạm vi lab.
+
+> **Bài học phương pháp:** một kỹ thuật được benchmark quốc tế chứng minh có lợi (+7,4% NDCG) vẫn có thể **vô ích hoặc có hại** trên corpus khác ngôn ngữ và khác dạng lỗi. Nhóm giữ lại `policy_contextual_hybrid` trong harness làm bằng chứng đo đạc, nhưng **chiến lược nộp bài vẫn là `policy_contextual`** vì đơn giản hơn mà kết quả tương đương.
+
 **b) Chỉ còn Grounded@3 phân biệt được — và nó phơi bày `sentences_3`.** Chỉ số này rơi xuống **0.40** ở corpus B trong khi Hit@3 vẫn 1.00: chiến lược tìm **đúng tài liệu** nhưng lấy **sai đoạn**. Chi tiết ở phần Phân tích lỗi (ca lỗi 3).
 
 ---
