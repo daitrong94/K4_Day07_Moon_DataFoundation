@@ -1,5 +1,5 @@
 ---
-doc_id: tiki-seller-rights-obligations
+doc_id: seller-listing
 title: Quyền và nghĩa vụ của Nhà Bán và Tiki
 source_url: https://hocvien.tiki.vn/faq/quyen-va-nghia-vu-cua-nha-ban-va-tiki/
 retrieved_at: 2026-08-03
