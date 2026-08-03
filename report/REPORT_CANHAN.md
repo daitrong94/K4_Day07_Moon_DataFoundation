@@ -135,37 +135,37 @@ tests/test_solution.py::TestEmbeddingStoreDeleteDocument::test_delete_returns_tr
 
 ## 4. Dự đoán độ tương tự (Similarity Predictions) — Cá nhân (5 điểm)
 
-> **Lưu ý:** phần này chạy bằng `MockEmbedder` (mặc định của lab), không phải embedder ngữ nghĩa thật (`EMBEDDING_PROVIDER=local`). README đã cảnh báo mock "gần như ngẫu nhiên theo chuỗi" — kết quả dưới đây minh hoạ đúng điều đó, không dùng để kết luận chất lượng ngữ nghĩa.
+> Chạy bằng `OpenAIEmbedder` (`text-embedding-3-small`, `EMBEDDING_PROVIDER=openai`, key trong `.env` cục bộ — không commit) để có kết quả phản ánh ngữ nghĩa thật, thay vì `MockEmbedder`. (Lần chạy đầu bằng mock cho kết quả gần-ngẫu-nhiên — xem lịch sử; giữ nguyên bộ 5 cặp câu để so sánh trực tiếp mock vs thật ở mục "bất ngờ nhất" bên dưới.)
 
-| Cặp | Câu A | Câu B | Dự đoán | Điểm thực tế | Đúng? |
-|------|-----------|-----------|---------|--------------|-------|
-| 1 | "Người mua có thể trả hàng trong 15 ngày kể từ khi nhận được sản phẩm." | "Thời hạn hoàn trả sản phẩm cho người mua là 15 ngày kể từ ngày giao hàng thành công." (paraphrase) | cao | 0.0578 | Sai hướng độ lớn — đúng dấu (dương) nhưng gần 0, không "cao" như kỳ vọng |
-| 2 | "Người mua có thể trả hàng trong 15 ngày kể từ khi nhận được sản phẩm." | "Con mèo đang ngủ trên ghế sofa trong phòng khách." (không liên quan) | thấp | 0.0110 | Đúng — gần 0 |
-| 3 | "Shopee hỗ trợ thanh toán bằng thẻ tín dụng, ví điện tử và COD." | "Bạn có thể thanh toán đơn hàng qua thẻ ghi nợ, ShopeePay hoặc trả tiền khi nhận hàng." (paraphrase) | cao | -0.1224 | **Sai hẳn** — hai câu paraphrase lại có điểm âm |
-| 4 | "Người bán không được đăng bán hàng cấm như vũ khí và ma túy." | "Hôm nay trời nắng đẹp, thích hợp để đi dạo công viên." (không liên quan) | thấp | 0.1364 | **Sai hẳn** — cặp không liên quan lại có điểm dương cao hơn cả cặp paraphrase ở trên |
-| 5 | "Chính sách bảo mật quy định Shopee thu thập tên, email và số điện thoại của người dùng." | "Người bán phải chịu trách nhiệm về chất lượng và nguồn gốc sản phẩm đăng bán." (cùng miền chính sách, khác chủ đề con) | thấp | -0.2675 | Đúng hướng (thấp/âm) |
+| Cặp | Câu A | Câu B | Dự đoán | Điểm mock (trước) | Điểm thật (OpenAI) | Đúng? |
+|------|-----------|-----------|---------|:---:|:---:|-------|
+| 1 | "Người mua có thể trả hàng trong 15 ngày kể từ khi nhận được sản phẩm." | "Thời hạn hoàn trả sản phẩm cho người mua là 15 ngày kể từ ngày giao hàng thành công." (paraphrase) | cao | 0.0578 | **0.8334** | Đúng — rất cao |
+| 2 | "Người mua có thể trả hàng trong 15 ngày kể từ khi nhận được sản phẩm." | "Con mèo đang ngủ trên ghế sofa trong phòng khách." (không liên quan) | thấp | 0.0110 | **0.2276** | Đúng — thấp rõ rệt so với cặp 1 |
+| 3 | "Shopee hỗ trợ thanh toán bằng thẻ tín dụng, ví điện tử và COD." | "Bạn có thể thanh toán đơn hàng qua thẻ ghi nợ, ShopeePay hoặc trả tiền khi nhận hàng." (paraphrase) | cao | -0.1224 | **0.7194** | Đúng — cao |
+| 4 | "Người bán không được đăng bán hàng cấm như vũ khí và ma túy." | "Hôm nay trời nắng đẹp, thích hợp để đi dạo công viên." (không liên quan) | thấp | 0.1364 | **0.2470** | Đúng — thấp |
+| 5 | "Chính sách bảo mật quy định Shopee thu thập tên, email và số điện thoại của người dùng." | "Người bán phải chịu trách nhiệm về chất lượng và nguồn gốc sản phẩm đăng bán." (cùng miền chính sách, khác chủ đề con) | thấp | -0.2675 | **0.2908** | Đúng — thấp hơn hẳn 2 cặp paraphrase (1, 3) dù cùng miền chính sách TMĐT |
 
 **Kết quả nào bất ngờ nhất? Điều này nói gì về cách embeddings biểu diễn ý nghĩa?**
-> Bất ngờ nhất là cặp 3 và 4: hai câu paraphrase gần như cùng nghĩa (nói về phương thức thanh toán) lại có điểm **âm** (-0.1224), trong khi hai câu hoàn toàn không liên quan (chính sách hàng cấm vs. thời tiết) lại có điểm **dương** (0.1364) cao hơn. Điều này khẳng định đúng cảnh báo của lab: `MockEmbedder` sinh vector từ hash MD5 của chuỗi ký tự (`hashlib.md5`) rồi biến đổi thành số giả-ngẫu-nhiên — nó không hề "đọc hiểu" nội dung câu, chỉ tình cờ tạo ra vector có hướng gần/xa nhau dựa trên chuỗi byte đầu vào. Bài học rút ra: cosine similarity chỉ tốt bằng chất lượng của embedding tạo ra nó — công thức toán đúng không đảm bảo kết quả có ý nghĩa nếu vector đầu vào không thực sự mã hoá ngữ nghĩa. Muốn dự đoán mức tương tự "có ý nghĩa", bắt buộc phải dùng embedder ngữ nghĩa thật (`LocalEmbedder`/`OpenAIEmbedder`).
+> Bất ngờ nhất là **độ lệch giữa mock và embedder thật trên cùng 5 cặp câu**: với `MockEmbedder`, cặp paraphrase #3 (cùng nói về phương thức thanh toán) ra điểm **âm** (-0.1224) trong khi cặp không liên quan #4 lại ra điểm **dương** cao hơn (0.1364) — sai hoàn toàn trực giác. Đổi sang `OpenAIEmbedder`, đúng 5/5 dự đoán khớp trực giác, và đặc biệt rõ: hai cặp paraphrase (#1, #3) đạt 0.72–0.83 — cao hẳn so với mọi cặp không paraphrase (0.22–0.29), kể cả cặp #5 tuy cùng miền chính sách TMĐT nhưng khác chủ đề con (bảo mật vs. trách nhiệm người bán) vẫn chỉ 0.29, gần với mức "không liên quan" chứ không nhích lên do "cùng lĩnh vực". Bài học: `compute_similarity()` chỉ là công thức toán đúng; **chất lượng embedding mới quyết định kết quả có ý nghĩa hay không** — cùng một hàm, cùng 5 cặp câu, đổi embedder là đổi hẳn kết luận.
 
 ---
 
 ## 5. Kết quả truy xuất của tôi (Competition Results) — Cá nhân (10 điểm)
 
-> **Lưu ý:** nhóm chưa chốt chính thức 5 câu hỏi đánh giá trong `REPORT_NHOM.md` tại thời điểm viết báo cáo này, nên dưới đây là **5 câu hỏi đề xuất** của tôi trên bộ dữ liệu `data/k4_ecommerce/` (đúng chủ đề K4), chạy bằng `build_knowledge_base()` + `MockEmbedder` (chưa cài `EMBEDDING_PROVIDER=local`). Kết quả cần chạy lại với embedder thật + bộ câu hỏi nhóm thống nhất trước khi tổng hợp vào `REPORT_NHOM.md`. `llm_fn` dùng hàm giả lập (không có API key LLM thật trong môi trường lab) chỉ để xác nhận pipeline retrieve → prompt → answer nối thông đúng luồng.
+> Chạy đúng **5 câu hỏi benchmark chính thức của nhóm** (đã được Trần Tuấn Anh và Nguyễn Xuân Đức độc lập thống nhất giống hệt nhau trong `REPORT_NHOM.md` của họ — xem `report/SO_SANH_NHOM.md` mục 1). Pipeline: `build_knowledge_base("data/k4_ecommerce", OpenAIEmbedder(), chunker=RecursiveChunker(400))` — **embedder thật** (`text-embedding-3-small`, key trong `.env` cục bộ), thay cho mock ở lần chạy trước. `llm_fn` vẫn là hàm giả lập trích nguyên văn ngữ cảnh (không có quyền dùng API LLM sinh văn bản thật trong lab này) — chỉ để xác nhận pipeline retrieve → prompt → answer nối thông đúng luồng và trích dẫn đúng chunk.
 
 | # | Câu hỏi (Query) | Top-1 Chunk truy xuất được (tóm tắt) | Điểm Score | Có liên quan không? (Relevant) | Câu trả lời của Agent (tóm tắt) |
 |---|-------|--------------------------------|-------|-----------|------------------------|
-| 1 | Người mua có bao nhiêu ngày để yêu cầu trả hàng? | `shipping-policy` — bảng giới hạn kích thước/trọng lượng gói hàng | 0.2364 | Không (top-1 sai); `returns-policy` chỉ đứng thứ 2 (0.2105), đúng tài liệu nhưng không trúng đúng câu "15 ngày" | Có trả lời (agent stub), nhưng context top-1 không chứa đáp án thật |
-| 2 | Shopee hỗ trợ những phương thức thanh toán nào? | `prohibited-products` — đoạn về giữ tem/bao bì | 0.2429 | Không ở top-1; `payment-methods` đứng thứ 2 (0.2327) và có nội dung đúng | Trả lời dựa trên context lẫn cả đoạn không liên quan |
-| 3 | Người bán không được đăng bán những loại hàng hóa nào? *(metadata_filter={"customer_role":"seller"})* | `prohibited-products` — mục "Danh mục hàng cấm/hạn chế" | 0.1126 | **Có** — đúng tài liệu, đúng nội dung ngay top-1 | Trả lời đúng hướng nhờ context liên quan |
-| 4 | Shopee thu thập những loại thông tin cá nhân nào của người dùng? | `shipping-policy` — đoạn về xử lý khiếu nại | 0.3177 | **Không** — cả top-3 đều không thuộc `privacy-policy-shopee`, truy xuất thất bại hoàn toàn | Agent buộc phải trả lời dựa trên context sai chủ đề |
-| 5 | Nhà bán trên Tiki có nghĩa vụ gì nếu vi phạm chính sách khuyến mãi? *(metadata_filter={"customer_role":"seller"})* | `prohibited-products` — đoạn liệt kê dịch vụ bất hợp pháp | 0.1792 | Một phần — đúng vai trò `seller` nhờ filter, nhưng sai tài liệu; `seller-listing` (chứa "Hình thức xử lý vi phạm") chỉ lọt top-3 ở vị trí cuối và là đoạn tiêu đề, chưa tới đúng đoạn có đáp án | Context không đủ để trả lời chính xác nghĩa vụ cụ thể |
+| 1 | Thời hạn gửi yêu cầu trả hàng/hoàn tiền... | `shopee-return-refund-policy` — "**15 ngày** kể từ khi đơn hàng được giao thành công. **24 giờ** đối với thực phẩm tươi sống..." | 0.5991 | **Có** — Hit@1 đúng, đúng câu chứa đáp án | Trích đúng "15 ngày" / "24 giờ" từ ngữ cảnh |
+| 2 | Nhà bán trên Tiki bị xử lý thế nào nếu gian lận... *(filter seller)* | `tiki-seller-rights-obligations` — liệt kê đúng hành vi gian lận nêu trong câu hỏi | 0.6543 | **Có** — Hit@1 đúng | Trích đúng danh sách hành vi cấm, tuy chunk top-1 chưa gồm đoạn "Hình thức xử lý" (ở chunk kế) |
+| 3 | Shopee hỗ trợ phương thức thanh toán nào, hạn mức Apple Pay? *(filter buyer)* | `shopee-payment-methods` — mở đầu "Shopee hiện hỗ trợ 9 hình thức thanh toán chính" | 0.6712 | **Có** — Hit@1 đúng | Trích đúng tài liệu; hạn mức Apple Pay nằm ở chunk khác cùng doc (không lọt top-1 vì `top_k=3` đã ưu tiên đoạn mở đầu) |
+| 4 | Hàng hóa cấm đăng bán trên sàn TMĐT bao gồm loại nào? | `tiki-seller-rights-obligations` — câu tổng quát "không được kinh doanh hàng hóa bị cấm..." | 0.5301 | **Không** — `shopee-prohibited-products-policy` (tài liệu gold, có danh mục chi tiết) không lọt top-3 | Agent trả lời dựa trên câu tổng quát, thiếu danh mục cụ thể (súng, ma túy, hàng giả…) |
+| 5 | Thời gian xử lý khiếu nại vận chuyển tối đa bao nhiêu ngày? | `shopee-shipping-policy` — "Thời gian xử lý khiếu nại tối đa **10 ngày làm việc**..." | 0.6641 | **Có** — Hit@1 đúng | Trích đúng "10 ngày làm việc" |
 
-**Bao nhiêu câu hỏi trả về chunk có liên quan trong top-3?** 3 / 5 (câu 1, 2, 3 có chunk đúng tài liệu trong top-3; câu 4 thất bại hoàn toàn; câu 5 chỉ đúng vai trò nhờ metadata filter nhưng chưa đúng đoạn nội dung).
+**Bao nhiêu câu hỏi trả về chunk có liên quan trong top-3?** **4 / 5** (Hit@1 = Hit@3 = 4/5 — tăng mạnh so với lần chạy mock trước đó, xem `report/SO_SANH_NHOM.md`). Câu 4 là **failure case thật**: hai tài liệu cùng nhắc "hàng hóa bị cấm" ở hai mức độ chi tiết khác nhau (câu tổng quát trong `tiki-seller-rights-obligations` vs. danh mục đầy đủ trong `shopee-prohibited-products-policy`) — embedding đánh giá câu tổng quát "giống câu hỏi" hơn vì câu hỏi cũng diễn đạt chung chung, trong khi tài liệu gold chứa toàn tên hàng hóa cụ thể (súng, ma túy, hàng giả...) nên vector lệch xa hơn so với cách diễn đạt của câu hỏi. Đây là ứng viên tốt cho Bài 3.5 (Phân tích lỗi) của nhóm.
 
 **Điều hay nhất tôi học được từ thành viên khác / nhóm khác (qua demo):**
-> *(Chưa có dữ liệu — nhóm chưa demo/so sánh chiến lược. Sẽ cập nhật sau khi nhóm chạy benchmark chung với `EMBEDDING_PROVIDER=local` theo `REPORT_NHOM.md`.)*
+> Từ việc đọc chéo code 3 nhánh còn lại (xem `report/SO_SANH_NHOM.md`): Nguyễn Xuân Đức trung thực báo cáo Hit@3 = 0/10 khi chạy mock thay vì tô hồng kết quả — cách làm này giúp cả nhóm sớm nhận ra mock là nút thắt thật sự (điều tôi vừa xác nhận lại bằng embedder thật ở trên). Phổ Hiếu Anh đóng góp kỹ thuật Hybrid BM25+RRF — về lý thuyết hữu ích nhất cho các câu hỏi có số liệu/tên riêng (giống câu 3 ở trên, nơi "Apple Pay" và "10.000–25.000.000 VNĐ" là token hiếm mà BM25 khớp tốt hơn dense).
 
 ---
 
@@ -177,5 +177,5 @@ tests/test_solution.py::TestEmbeddingStoreDeleteDocument::test_delete_returns_tr
 | Hướng tiếp cận của tôi (My Approach) | 10 / 10 |
 | Hoàn thiện code (Core Implementation — tests) | 30 / 30 |
 | Dự đoán độ tương tự (Similarity Predictions) | 5 / 5 |
-| Kết quả truy xuất của tôi (Competition Results) | 6 / 10 *(dùng mock embedder + câu hỏi chưa chốt với nhóm; cần chạy lại với `EMBEDDING_PROVIDER=local` và bộ câu hỏi chính thức)* |
-| **Tổng phần cá nhân** | **56 / 60** |
+| Kết quả truy xuất của tôi (Competition Results) | 9 / 10 *(Hit@1=Hit@3=4/5 với OpenAIEmbedder thật, đúng 5 câu hỏi nhóm; trừ 1 điểm vì `llm_fn` vẫn là hàm giả lập, chưa phải LLM sinh văn bản thật)* |
+| **Tổng phần cá nhân** | **59 / 60** |

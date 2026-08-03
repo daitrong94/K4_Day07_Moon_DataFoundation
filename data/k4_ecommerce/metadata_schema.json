@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0",
+  "corpus": "K4 — chính sách thương mại điện tử / hỗ trợ khách hàng (Shopee & Tiki)",
+  "note": "Schema này được ép bằng scripts/validate_metadata.py — không phải mô tả suông. Mọi tài liệu trong data/k4_ecommerce/*.md nên qua validator trước khi chạy benchmark.",
+  "fields": {
+    "doc_id": {
+      "type": "slug",
+      "required": true,
+      "unique": true,
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "purpose": "Khóa của tài liệu. Nên trùng tên file (không bắt buộc nhưng khuyến nghị theo docs/DATA_COLLECTION.md). delete_document() xóa theo metadata['doc_id'] và Hit@1/Hit@3 chấm theo trường này."
+    },
+    "title": {
+      "type": "string",
+      "required": true,
+      "purpose": "Tên tài liệu hiển thị trong báo cáo/benchmark."
+    },
+    "source_url": {
+      "type": "url",
+      "required": true,
+      "pattern": "^https://",
+      "purpose": "Truy vết câu trả lời về trang gốc. Bắt buộc theo docs/DATA_COLLECTION.md."
+    },
+    "retrieved_at": {
+      "type": "date",
+      "required": true,
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "purpose": "Ngày thu thập dữ liệu. Bắt buộc theo docs/DATA_COLLECTION.md."
+    },
+    "document_version": {
+      "type": "string",
+      "required": true,
+      "pattern": "^(\\d{4}-\\d{2}-\\d{2}|not-stated)$",
+      "purpose": "Ngày hiệu lực do CHÍNH trang nguồn công bố, dạng YYYY-MM-DD; 'not-stated' nếu trang không nêu — không được bịa. Bắt buộc theo docs/DATA_COLLECTION.md."
+    },
+    "customer_role": {
+      "type": "enum",
+      "required": true,
+      "values": ["buyer", "seller", "both"],
+      "purpose": "Trường lọc BẮT BUỘC của K4 (xem K4_VARIANT.md). search_with_filter({'customer_role': 'seller'}) dùng đúng trường này để tách câu hỏi người mua khỏi tài liệu người bán."
+    },
+    "category": {
+      "type": "enum",
+      "required": true,
+      "values": ["returns", "seller-terms", "shipping", "privacy", "payment", "platform-rules", "prohibited-products"],
+      "purpose": "Trường hữu ích thứ hai theo yêu cầu K4 — ngăn câu hỏi về một mảng chính sách (vd. giao hàng) bị kéo về tài liệu thuộc mảng khác (vd. đổi trả)."
+    },
+    "language": {
+      "type": "enum",
+      "required": true,
+      "values": ["vi", "en"],
+      "purpose": "Corpus hiện thuần tiếng Việt; giữ trường này để mở rộng song ngữ mà không phải đổi schema."
+    },
+    "chunk_index": {
+      "type": "int",
+      "required": false,
+      "added_by": "ingest.chunk_document",
+      "purpose": "Thứ tự chunk trong tài liệu, gắn tự động khi build_knowledge_base() chạy — không khai trong front matter."
+    },
+    "source": {
+      "type": "path",
+      "required": false,
+      "added_by": "ingest.load_documents",
+      "purpose": "Đường dẫn file trên đĩa, gắn tự động — không khai trong front matter."
+    }
+  }
+}
