@@ -1,5 +1,5 @@
 ---
-doc_id: shipping-policy
+doc_id: shopee-shipping-policy
 title: Chính sách vận chuyển Shopee
 source_url: https://help.shopee.vn/portal/4/article/77250-CH%C3%8DNH-S%C3%81CH-V%E1%BA%ACN-CHUY%E1%BB%82N-SHOPEE
 retrieved_at: 2026-08-03

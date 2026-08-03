@@ -1,5 +1,5 @@
 ---
-doc_id: returns-policy
+doc_id: shopee-return-refund-policy
 title: Chính sách trả hàng và hoàn tiền Shopee
 source_url: https://help.shopee.vn/portal/4/article/77251
 retrieved_at: 2026-08-03

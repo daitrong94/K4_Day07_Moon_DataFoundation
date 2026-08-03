@@ -1,5 +1,5 @@
 ---
-doc_id: payment-methods
+doc_id: shopee-payment-methods
 title: Các phương thức thanh toán trên Shopee
 source_url: https://help.shopee.vn/portal/4/article/79198-%5BTh%C3%A0nh-vi%C3%AAn-m%E1%BB%9Bi%5D-Shopee-hi%E1%BB%87n-%C4%91ang-c%C3%B3-nh%E1%BB%AFng-ph%C6%B0%C6%A1ng-th%E1%BB%A9c-thanh-to%C3%A1n-n%C3%A0o
 retrieved_at: 2026-08-03

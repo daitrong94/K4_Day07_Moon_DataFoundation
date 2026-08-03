@@ -1,5 +1,5 @@
 ---
-doc_id: privacy-policy-tiki
+doc_id: tiki-privacy-policy
 title: Chính sách bảo mật thông tin cá nhân Tiki
 source_url: https://tiki.vn/thong-tin/privacy-policy
 retrieved_at: 2026-08-03

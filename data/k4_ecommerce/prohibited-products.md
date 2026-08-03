@@ -1,5 +1,5 @@
 ---
-doc_id: prohibited-products
+doc_id: shopee-prohibited-products-policy
 title: Chính sách cấm/hạn chế sản phẩm Shopee
 source_url: https://help.shopee.vn/portal/4/article/77247-CH%C3%8DNH-S%C3%81CH-C%E1%BA%A4M/H%E1%BA%A0N-CH%E1%BA%BE-S%E1%BA%A2N-PH%E1%BA%A8M
 retrieved_at: 2026-08-03

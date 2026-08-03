@@ -1,5 +1,5 @@
 ---
-doc_id: marketplace-rules
+doc_id: shopee-marketplace-rules
 title: Quy chế hoạt động sàn thương mại điện tử Shopee.vn
 source_url: https://help.shopee.vn/portal/4/article/77245
 retrieved_at: 2026-08-03
