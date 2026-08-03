@@ -56,7 +56,7 @@ BENCHMARK_QUERIES = [
         "id": 4,
         "query": "Các loại hàng hóa cấm đăng bán hoặc kinh doanh trên sàn giao dịch thương mại điện tử bao gồm những loại nào?",
         "gold_answer": "Bao gồm vũ khí, chất cháy nổ, hàng giả/hàng nhái, ma túy/chất kích thích, động vật hoang dã, thuốc lá/thuốc lá điện tử, và hàng hóa bị cấm theo quy định pháp luật.",
-        "target_doc_id": "k4-prohibited-products",
+        "target_doc_id": "shopee-prohibited-products-policy",
         "metadata_filter": None,
     },
     {
@@ -79,16 +79,21 @@ def run_benchmark(data_dir: str = "data/k4_ecommerce"):
     print(f"Embedding Model: {embedder_name}")
     print("-" * 80)
 
-    # Build Knowledge Base
-    store = build_knowledge_base(data_dir, embedding_fn=embedder)
+    # Build Knowledge Base (RecursiveChunker khớp chiến lược ghi trong REPORT_NHOM.md;
+    # trước đây không truyền chunker nên âm thầm rơi về FixedSizeChunker mặc định)
+    store = build_knowledge_base(data_dir, embedding_fn=embedder, chunker=RecursiveChunker(chunk_size=500))
     print(f"Successfully loaded {store.get_collection_size()} chunks into EmbeddingStore.\n")
 
     def simple_llm(prompt: str) -> str:
-        lines = prompt.splitlines()
-        context_lines = [l for l in lines if l.startswith("[")]
-        if context_lines:
-            return f"[Gold Grounded Answer] dựa trên chunk truy xuất được: {context_lines[0][:150]}..."
-        return "Không đủ thông tin trong ngữ cảnh được cung cấp."
+        # Khớp đúng format prompt của KnowledgeBaseAgent.answer() trong repo này
+        # ("Ngữ cảnh:\n...\n\nCâu hỏi:"), không phải format "[1] ..." của bản gốc.
+        if "Ngữ cảnh:" not in prompt:
+            return "Không đủ thông tin trong ngữ cảnh được cung cấp."
+        context = prompt.split("Ngữ cảnh:", 1)[1].split("\nCâu hỏi:", 1)[0].strip()
+        if not context:
+            return "Không đủ thông tin trong ngữ cảnh được cung cấp."
+        preview = context.replace("\n", " ")[:150]
+        return f"[Gold Grounded Answer] dựa trên chunk truy xuất được: {preview}..."
 
     agent = KnowledgeBaseAgent(store=store, llm_fn=simple_llm)
 
