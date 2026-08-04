@@ -1,8 +1,15 @@
 # Báo Cáo Nhóm — Lab 7: Embedding & Vector Store
 
-**Nhóm:** [Tên nhóm]
-**Thành viên:** [Họ tên từng thành viên]
-**Ngày:** [Ngày nộp]
+**Nhóm:** K4-Moon
+**Thành viên:**
+| # | Họ tên | MSSV | Nhánh git | Chiến lược phụ trách |
+|---|---|---|---|---|
+| 1 | Phó Hiếu Anh | 2A202601312 | `feat/2A202601312-phohieuanh` | `PolicySectionChunker` + contextual prefix + Hybrid BM25/RRF (custom) |
+| 2 | Trần Tuấn Anh | 2A202601086 | `2a202601086-TranTuanAnh` | `RecursiveChunker` + metadata pre-filter (+ nhánh ChromaDB thật) |
+| 3 | Nguyễn Xuân Đức | 2A202601112 | `NguyenXuanDuc` | `RecursiveChunker(chunk_size=400)` |
+| 4 | Hoàng Trọng Đại | — | `main` | `RecursiveChunker(400)` + **chạy đối chứng bằng embedder thật (OpenAI)** + đọc chéo 4 nhánh |
+
+**Ngày:** 2026-08-04
 
 > **Nộp 1 bản / nhóm.** Phần cá nhân (hướng tiếp cận, kết quả riêng, dự đoán…) mỗi thành viên nộp riêng trong `REPORT_CANHAN.md`. Chi tiết thang điểm: `docs/SCORING.md`.
 
@@ -90,7 +97,7 @@ Chạy trên **toàn bộ 9 tài liệu** (88.065 ký tự), embedder `AITeamVN/
 
 > Mỗi thành viên điền một khối dưới đây (copy thêm nếu nhóm có nhiều hơn 3 người).
 
-**Thành viên 1 — [Tên]**
+**Thành viên 1 — Phó Hiếu Anh** *(corpus A — 9 chính sách bán lẻ)*
 - **Loại chiến lược:** Custom — `PolicySectionChunker` + contextual prefix (`src/custom_chunking.py`)
 - **Mô tả & lý do chọn cho chủ đề này:** Trang chính sách bán lẻ là một chuỗi điều khoản ngắn, tự chứa ("2.1 Thời gian đổi trả", "A. QUYỀN LỢI"). Cắt theo ký tự làm mức phí "trừ 20%" rời khỏi dòng nêu nhóm sản phẩm nó áp dụng, nên chiến lược này cắt theo **tiêu đề điều khoản** thay vì theo độ dài; điều khoản quá ngắn được gộp với điều khoản kế, quá dài thì rơi về `RecursiveChunker`. Sau đó mỗi chunk được **gắn tiền tố ngữ cảnh** `[title | category | customer_role]` trước khi embed — kỹ thuật contextual retrieval của Anthropic (giảm 35% số lần truy xuất trượt), biến một chunk trơ như "trừ phí 20%" thành một chunk tự khai báo nó thuộc chính sách nào, của ai.
 - **Code snippet:**
@@ -116,19 +123,107 @@ class PolicySectionChunker:
 content = f"[{title} | {category} | {customer_role}]\n{piece}"
 ```
 
-**Thành viên 2 — [Tên]**
-- **Loại chiến lược:**
-- **Mô tả & lý do chọn:**
-- **Code snippet (nếu custom):**
+**Thành viên 2 — Trần Tuấn Anh** *(corpus B — 8 chính sách Shopee/Tiki)*
+- **Loại chiến lược:** `RecursiveChunker` + **metadata pre-filtering** theo `customer_role`
+- **Mô tả & lý do chọn cho chủ đề này:** Ưu tiên giữ nguyên cấu trúc tiêu đề (`\n\n`, `\n`) và trọn vẹn từng điều khoản chính sách, sau đó **thu hẹp tập ứng viên bằng metadata trước khi tính similarity**. Lập luận cốt lõi của bạn ấy: corpus Shopee/Tiki trộn lẫn tài liệu người mua và người bán nói cùng một trường từ vựng ("đơn hàng", "hoàn tiền", "vi phạm"), nên semantic search thuần rất dễ trả lời câu hỏi của người bán bằng quy định của người mua — filter `customer_role` cắt hẳn nhóm tài liệu sai vai trò ra khỏi cuộc thi điểm.
+- **Code snippet:**
+```python
+# Bench.py — tìm kiếm có/không pre-filter tùy câu hỏi
+if meta_filter:
+    results = store.search_with_filter(query, top_k=3, metadata_filter=meta_filter)
+else:
+    results = store.search(query, top_k=3)
+```
+- **Kết quả bạn ấy tự báo cáo:** 42/42 test pass; **4/5** câu có chunk liên quan trong top-3; 2/2 câu có dùng filter (`seller` cho Q2, `buyer` cho Q3) đạt **Hit@1**. Câu trượt là Q4 (hàng cấm).
+- **⚠️ Đính chính sau khi nhóm chạy lại (xem hộp bên dưới):** con số trên **không** được sinh ra bởi cấu hình mô tả ở trên. `Bench.py` thực tế chạy bằng `MockEmbedder` và `FixedSizeChunker(500, 50)`.
 
-**Thành viên 3 — [Tên]**
-- **Loại chiến lược:**
-- **Mô tả & lý do chọn:**
-- **Code snippet (nếu custom):**
+> #### Kiểm chứng: kết quả của `Bench.py` được sinh bằng MockEmbedder, không phải embedder ngữ nghĩa
+>
+> Khi khôi phục corpus B để chạy lại, nhóm phát hiện điểm số trong `Bench.py` **trùng khớp tới 3 chữ số thập phân ở cả 5 câu** với một lần chạy bằng `MockEmbedder` trên harness của Hiếu Anh:
+>
+> | Câu | Điểm trong báo cáo `Bench.py` | Chạy lại `run_benchmark.py`, backend **mock**, `fixed_500_50` |
+> |---|---:|---:|
+> | 1 | 0.3468 | **0.347** |
+> | 2 | 0.2290 | **0.229** |
+> | 3 | 0.3050 | **0.305** |
+> | 4 | 0.3823 | **0.382** |
+> | 5 | 0.1597 | **0.160** |
+>
+> Nguyên nhân nằm ngay trong mã nguồn `Bench.py`, không phải suy đoán:
+> - `get_embedder()` trả `MockEmbedder()` khi biến môi trường `EMBEDDING_PROVIDER` **không được đặt** — và đó là mặc định.
+> - `run_benchmark()` gọi `build_knowledge_base(data_dir, embedding_fn=embedder)` **không truyền `chunker`**, nên `ingest.py` rơi về `chunker = chunker or FixedSizeChunker()` = `FixedSizeChunker(500, 50)` — **không phải** `RecursiveChunker` như phần mô tả chiến lược ghi.
+> - Hàm `simple_llm` chỉ **echo lại dòng ngữ cảnh đầu tiên** (`f"[Gold Grounded Answer] dựa trên chunk truy xuất được: {context_lines[0][:150]}..."`), nên cột "Câu trả lời của Agent" trong báo cáo — vốn đọc rất trôi chảy và đúng gold answer — không thể là output thật của đoạn mã này.
+>
+> `MockEmbedder` băm MD5 nên **xác định (deterministic)**: bất kỳ ai chạy mock trên cùng corpus + cùng câu hỏi + cùng chunker đều ra đúng dãy số đó. Đây là lý do kiểm chứng này đáng tin.
+>
+> **Xác nhận độc lập:** Hoàng Trọng Đại phát hiện **cùng lỗi này** khi đọc chéo code, hoàn toàn tách biệt với đường kiểm chứng bằng số ở trên — `report/SO_SANH_NHOM.md` mục 2 ghi: *"`Bench.py` thực chất gọi `build_knowledge_base()` **không truyền chunker** → chạy `FixedSizeChunker` mặc định, lệch với chiến lược `RecursiveChunker` ghi trong `REPORT_NHOM.md`"*. Hai người, hai phương pháp (một đọc code, một khớp số), cùng một kết luận.
+>
+> **Đã được sửa:** commit `edb85ba` trên `main` truyền `chunker=RecursiveChunker(chunk_size=500)` và viết lại `simple_llm` cho khớp format prompt thật của `KnowledgeBaseAgent.answer()`.
+>
+> **Nhóm giữ nguyên phát hiện này trong báo cáo thay vì lặng lẽ sửa số**, vì nó dẫn thẳng tới bài học phương pháp quan trọng nhất của lab (xem Phần 4): *4/5 và 0/5 của hai bạn cùng dùng mock **không** phản ánh chênh lệch chất lượng — cả hai đều là kết quả ngẫu nhiên.*
+
+**Thành viên 3 — Nguyễn Xuân Đức** *(corpus B — 8 chính sách Shopee/Tiki)*
+- **Loại chiến lược:** `RecursiveChunker(chunk_size=400)` — chạy trên **`MockEmbedder`**
+- **Mô tả & lý do chọn cho chủ đề này:** Chọn chunk 400 ký tự vì chính sách TMĐT được viết thành các gạch đầu dòng ngắn; recursive ngắt ưu tiên tại `\n\n` rồi `\n` nên không làm nát điều khoản, mà chunk vẫn đủ nhỏ để nhét nhiều chunk vào ngữ cảnh LLM. Bạn ấy **không cài được embedder thật** (chưa cài `requirements-local.txt`) nên toàn bộ benchmark chạy bằng `MockEmbedder` (băm MD5).
+- **Kết quả bạn ấy tự báo cáo:** 42/42 test pass; **0/5** câu có chunk liên quan trong top-3. Baseline chunking đo trên `shopee-return-refund-policy.md`: fixed 30 chunk (195,1 ký tự) / sentences 22 chunk (198,3) / recursive 35 chunk (123,9).
+- **Vì sao nhóm giữ lại kết quả 0/5 thay vì bỏ đi:** đây là **thí nghiệm đối chứng** — xem mục "Bài học rút ra" ở Phần 4.
+
+**Thành viên 4 — Hoàng Trọng Đại** *(corpus B — nhánh `main`)*
+- **Loại chiến lược:** `RecursiveChunker(400)`, cộng thêm **vai trò đối chứng của cả nhóm**: đọc chéo code cả 4 nhánh, trích code từng người bằng `git show <branch>:src/*.py` ra package riêng rồi chạy lại trên **cùng corpus, cùng 5 câu hỏi, cùng embedder** để so sánh công bằng (`report/SO_SANH_NHOM.md` trên nhánh `main`).
+- **Đóng góp quyết định — lần chạy bằng embedder THẬT:** bạn ấy là người duy nhất chạy được `OpenAIEmbedder` (`text-embedding-3-small`). Giữ nguyên chunking, nguyên corpus, nguyên 5 câu hỏi, **chỉ đổi embedder**:
+
+  | Biến thể | Hit@1 | Hit@3 |
+  |---|---:|---:|
+  | Mock — bất kỳ chiến lược nào trong 5 | 0–1/5 | 2/5 |
+  | **OpenAI `text-embedding-3-small` + `RecursiveChunker(400)`** | **4/5** | **4/5** |
+
+  Đây là **phép đo tách biến sạch nhất mà nhóm có**: 2/5 → 4/5 chỉ do đổi embedder.
+- **Bug thật bạn ấy phát hiện khi đọc chéo:** `delete_document` trên nhánh Trần Tuấn Anh lọc theo `record["id"]`, trong khi pipeline thật (`ingest.build_knowledge_base`) sinh chunk-id dạng `"policy-x::chunk_0"` và chỉ gắn `doc_id` vào **metadata**. Hệ quả: chạy `delete_document()` sau `build_knowledge_base()` **không xóa được gì**, dù `tests/test_solution.py` vẫn xanh 100% (vì test gốc gọi thẳng `add_documents()` với `Document.id == doc_id`). Bạn ấy viết `tests/test_extra_coverage.py` để bắt đúng ca này.
+- **Bạn ấy cũng đã sửa `Bench.py` trên `main`** (commit `edb85ba`): cả lỗi `target_doc_id` ở Q4 lẫn lỗi thiếu tham số `chunker` — xem hai hộp kiểm chứng bên dưới.
 
 ### So Sánh Giữa Các Thành Viên
 
-Cùng corpus, cùng 5 câu hỏi, cùng embedder — chỉ khác chiến lược chia nhỏ. Đo bằng `scripts/run_benchmark.py`:
+**a) So sánh theo thành viên** (mỗi người một chiến lược, cùng bộ 5 câu hỏi chung của nhóm):
+
+| Thành viên | Chiến lược **thực tế đã chạy** | Embedder **thực tế** | Corpus | Hit@3 | Grounded@3 | Điểm truy xuất (/10) |
+|---|---|---|---|:---:|:---:|:---:|
+| **Phó Hiếu Anh** | `PolicySectionChunker` + contextual prefix | `AITeamVN/Vietnamese_Embedding` (**thật**, 1024d) | A + B | **5/5** | **1.00** | **10/10** |
+| **Hoàng Trọng Đại** | `RecursiveChunker(400)` | `OpenAI text-embedding-3-small` (**thật**) | B | **4/5** | — *(không đo)* | **8/10** |
+| **Trần Tuấn Anh** | `FixedSizeChunker(500, 50)` *(mặc định của `ingest.py`)* | `MockEmbedder` (băm MD5) | B | 4/5 *(tự báo cáo)* | 0.60 *(nhóm đo lại)* | — *(xem ghi chú)* |
+| **Nguyễn Xuân Đức** | `RecursiveChunker(400)` | `MockEmbedder` (băm MD5) | B | 0/5 | 0.00 | — *(xem ghi chú)* |
+
+**Ghi chú về cột điểm:** nhóm **không chấm điểm truy xuất** cho hai lần chạy bằng `MockEmbedder`, vì thứ hạng khi đó là ngẫu nhiên — chấm 8/10 hay 0/10 đều không phản ánh chất lượng chiến lược. Đây là quyết định có chủ ý, lý do ngay dưới đây.
+
+**Hai người dùng embedder thật, hai mô hình khác nhau, kết quả gần nhau (5/5 và 4/5)** — trong khi hai người dùng mock cho 4/5 và 0/5, tức **biên độ rộng hơn cả khoảng cách giữa hai embedder thật**. Riêng điều đó đã đủ nói rằng con số từ mock không mang thông tin.
+
+> **Điều so sánh này làm lộ ra — và nó NGƯỢC với kết luận nhóm định viết ban đầu:**
+>
+> Bản nháp đầu tiên của báo cáo này kết luận: *"khoảng cách 4/5 vs 0/5 chứng minh embedder quan trọng hơn chunking"*. **Kết luận đó sai.** Trần Tuấn Anh và Nguyễn Xuân Đức **dùng CÙNG một embedder** (`MockEmbedder`) — nên chênh lệch 4/5 vs 0/5 giữa hai bạn hoàn toàn là **may rủi**, sinh ra từ việc hai chunker khác nhau cắt ra những chuỗi khác nhau rồi được băm MD5 thành các vector ngẫu nhiên khác nhau.
+>
+> Chạy lại cả 6 chiến lược trên corpus B **bằng backend mock** cho thấy rõ biên độ may rủi đó:
+>
+> | Chiến lược (backend **mock**) | Hit@3 | Grounded@3 |
+> |---|---:|---:|
+> | `fixed_500_50` *(đúng cấu hình `Bench.py` của Tuấn Anh)* | **1.00** | 0.60 |
+> | `sentences_3` | 0.40 | 0.00 |
+> | `recursive_500` | 0.40 | 0.00 |
+> | `policy_sections` | 0.80 | 0.20 |
+> | `policy_contextual` | 0.40 | 0.20 |
+> | `policy_contextual_hybrid` | 0.40 | 0.20 |
+>
+> **Với embedder ngẫu nhiên, Hit@3 vẫn dao động 0.40 – 1.00 tùy chunker.** Nói cách khác, một mô hình nhúng **không hiểu gì về ngôn ngữ** vẫn có thể chạm điểm cao nếu chọn đúng (may) cấu hình. Chỉ `Grounded@3` là trụ được — mock cao nhất chỉ **0.60**, trong khi embedder thật đạt **1.00** ở cả 5 câu.
+>
+> **Đối chiếu chéo với số của Hoàng Trọng Đại — và một khác biệt cần nói thẳng.** Bạn ấy chạy lại cả 4 nhánh dưới mock và thu được Hit@3 = **2/5 cho mọi biến thể**, trong khi harness của tôi cho 0.40 – 1.00. Hai dãy số này **không mâu thuẫn**, chúng chấm theo hai định nghĩa gold khác nhau:
+> - Bộ của bạn ấy giữ `target_doc_id = "k4-prohibited-products"` ở Q4 (id không tồn tại) nên **Q4 luôn trượt với mọi biến thể** — khớp đúng dòng "Q4 — 0/5 biến thể" trong `SO_SANH_NHOM.md`. Bộ của tôi đã sửa id nên Q4 có thể đạt.
+> - Harness của tôi tính Hit@3 là "có chunk thuộc **tập** `gold_doc_ids` trong top-3" (một số câu có 2 tài liệu gold), còn bạn ấy so với **một** `target_doc_id` duy nhất — chặt hơn.
+>
+> Bài học phụ, nhưng đắt: **hai bảng điểm cùng tên "Hit@3" mà lệch nhau tới 3/5 câu chỉ vì định nghĩa nhãn gold.** Muốn so điểm giữa các thành viên thì phải chốt **cùng file benchmark**, không chỉ chốt cùng câu hỏi.
+>
+> **Bằng chứng sạch nhất về nguyên nhân lại đến từ Hoàng Trọng Đại**, vì bạn ấy đổi **đúng một biến**: giữ nguyên `RecursiveChunker(400)`, nguyên corpus, nguyên 5 câu hỏi, chỉ thay mock → `OpenAI text-embedding-3-small`, và Hit@1 nhảy **0/5 → 4/5**. Đây mới là phép đo cho phép nói "embedder là nút thắt", chứ không phải phép so 4/5 với 0/5 giữa hai người **cùng dùng mock** như bản nháp đầu của báo cáo này đã làm.
+>
+> **Bài học đúng, thay cho kết luận sai ban đầu:** một điểm số chỉ có nghĩa khi so được với **đường cơ sở ngẫu nhiên (random baseline)**, và một so sánh chỉ kết luận được nhân quả khi **đổi đúng một biến**. Nhóm có sẵn cả hai thứ mà suýt bỏ qua: đường cơ sở là lần chạy mock của Nguyễn Xuân Đức, phép tách biến là lần chạy OpenAI của Hoàng Trọng Đại.
+
+**b) So sánh theo chiến lược.** Cùng corpus, cùng 5 câu hỏi, cùng embedder — chỉ khác chiến lược chia nhỏ. Đo bằng `scripts/run_benchmark.py`:
 
 | Chiến lược | Hit@3 | MRR@3 | Grounded@3 | Điểm mạnh | Điểm yếu |
 |---|---:|---:|---:|---|---|
@@ -149,7 +244,7 @@ Nói ngắn: **chia theo cấu trúc cải thiện thứ hạng, gắn ngữ c�
 
 ### Kiểm chứng chéo: chạy lại trên corpus thứ hai
 
-Kết quả trên một bộ dữ liệu chưa chứng minh được điều gì — chiến lược có thể chỉ đang khớp may mắn với đặc thù corpus. Nhóm chạy **cùng harness, cùng 5 chiến lược, cùng embedder** trên một corpus TMĐT thứ hai hoàn toàn độc lập: 8 chính sách Shopee/Tiki (~27.000 ký tự) do một thành viên khác thu thập, đặt tại `data/team_k4_corpus/`, bộ câu hỏi riêng tại `data/benchmark_team_corpus.json`.
+Kết quả trên một bộ dữ liệu chưa chứng minh được điều gì — chiến lược có thể chỉ đang khớp may mắn với đặc thù corpus. Nhóm chạy **cùng harness, cùng 5 chiến lược, cùng embedder** trên một corpus TMĐT thứ hai hoàn toàn độc lập: 8 chính sách Shopee/Tiki (~27.000 ký tự) do **Nguyễn Xuân Đức và Trần Tuấn Anh** thu thập, đặt tại `data/team_k4_corpus/`, bộ câu hỏi riêng tại `data/benchmark_team_corpus.json`.
 
 ```bash
 .venv/bin/python scripts/run_benchmark.py \
@@ -209,6 +304,21 @@ Token phân biệt không phải `10km` mà là **toán tử so sánh `=<` vs `>
 
 > **Đúng 5 câu hỏi**, đa dạng, có thể kiểm chứng; **ít nhất 1 câu** cần lọc metadata mới trả lời tốt. Đây là bộ câu hỏi chung cho mọi thành viên chạy.
 
+#### Ghi chú trung thực: nhóm có HAI corpus và HAI bộ câu hỏi
+
+Trong quá trình làm, nhóm chia dữ liệu thành hai hướng thay vì một:
+
+| | Corpus A — bán lẻ điện máy | Corpus B — sàn TMĐT |
+|---|---|---|
+| Tài liệu | 9 tl, 88.065 ký tự (CellphoneS, Di Động Việt, Hoàng Hà Mobile) | 8 tl, ~27.000 ký tự (Shopee, Tiki) |
+| Người thu thập | Phó Hiếu Anh | Nguyễn Xuân Đức, Trần Tuấn Anh, Hoàng Trọng Đại |
+| Bộ câu hỏi | [`data/k4_ecommerce/benchmark.json`](../data/k4_ecommerce/benchmark.json) | [`data/benchmark_tta_queries.json`](../data/benchmark_tta_queries.json) |
+| Ai đã chạy | Phó Hiếu Anh (5 chiến lược) | cả **4/4** thành viên |
+
+**Bộ câu hỏi CHUNG chính thức của nhóm — theo đúng yêu cầu "5 câu hỏi phải trùng nhau" của `docs/SCORING.md` — là bộ trên corpus B**, vì đó là bộ duy nhất cả bốn thành viên đều chạy (Trần Tuấn Anh trong `Bench.py`, Nguyễn Xuân Đức trong `bench.py`, Hoàng Trọng Đại trên `main`, Phó Hiếu Anh trong `scripts/run_benchmark.py`). Kết quả đối chiếu 4 người trên bộ này ở mục **"Kết quả bộ câu hỏi chung — cả 4 thành viên"** bên dưới.
+
+Bộ câu hỏi corpus A dưới đây được giữ lại làm **bộ mở rộng**: nó khó hơn có chủ đích (3 nhà bán lẻ nói cùng chủ đề với số liệu khác nhau) và là bộ duy nhất phân biệt được 5 chiến lược chia nhỏ — xem mục "Kiểm chứng chéo" ở Phần 2 để biết vì sao corpus B **không** phân biệt được.
+
 Bộ câu hỏi máy đọc được: [`data/k4_ecommerce/benchmark.json`](../data/k4_ecommerce/benchmark.json) — mỗi câu kèm `gold_doc_ids` (chấm Hit@3) và `gold_keywords` (chấm Grounded@3).
 
 | # | Câu hỏi (Query) | Câu trả lời chuẩn (Gold Answer) | Tài liệu chứa thông tin | Filter |
@@ -233,6 +343,29 @@ Chiến lược `policy_contextual`, top-3, embedder `AITeamVN/Vietnamese_Embedd
 | 4 | `ddv-bao-hanh-doi-tra-may-moi` | 0.652 | ✅ (hạng 1) | **2** | Hạng 3 chứa nguyên văn "đổi trả miễn phí 7 ngày đầu tiên" |
 | 5 | `cps-huy-giao-dich-doi-tra` | 0.439 | ✅ (hạng 1) | **2** | Hạng 1 chứa đủ cả hai số tổng đài |
 | | | | **5/5** | **8/10** | |
+
+### Kết quả bộ câu hỏi CHUNG — cả 4 thành viên (corpus B, Shopee/Tiki)
+
+Đây là bảng đối chiếu chính theo `docs/SCORING.md`: cùng 5 câu hỏi, cùng corpus, mỗi người chạy trên **mã nguồn `src` của riêng mình**. Hai cột đầu dùng **embedder thật**, hai cột sau dùng **mock** — đọc bảng phải tách hai nhóm này ra.
+
+| # | Câu hỏi chung của nhóm | Gold answer | Phó Hiếu Anh<br>`policy_contextual`<br>**Vietnamese_Embedding** | Hoàng Trọng Đại<br>`recursive(400)`<br>**OpenAI** | Trần Tuấn Anh<br>`fixed_500_50`<br>*Mock* | Nguyễn Xuân Đức<br>`recursive(400)`<br>*Mock* |
+|---|---|---|:---:|:---:|:---:|:---:|
+| 1 | Thời hạn gửi yêu cầu trả hàng/hoàn tiền với đơn giao thành công? | 15 ngày (24 giờ với thực phẩm tươi sống) | ✅ top-1 | ✅ **top-1** (0.599) | ✅ top-3 | ❌ |
+| 2 | Nhà bán Tiki bị xử lý thế nào nếu gian lận? | Ngưng hợp tác vĩnh viễn, thu hồi khuyến mãi, phong tỏa sao kê 90 ngày | ✅ top-1 | ✅ **top-1** (0.654, filter `seller`) | ✅ top-1 (filter `seller`) | ❌ |
+| 3 | Hạn mức Apple Pay trên Shopee? | 10.000 – 25.000.000 VNĐ, 9 phương thức thanh toán | ✅ top-1 | ✅ **top-1** (0.671, filter `buyer`) | ✅ top-1 (filter `buyer`) | ❌ |
+| 4 | Hàng hóa cấm đăng bán gồm những loại nào? | Hàng giả/nhái, vũ khí, ma túy, thuốc lá điện tử… | ✅ top-1 | ❌ **trượt cả top-3** | ❌ | ❌ |
+| 5 | Thời gian xử lý khiếu nại vận chuyển tối đa? | 10 ngày làm việc | ✅ top-1 | ✅ **top-1** (0.664) | ✅ top-3 | ❌ |
+| | **Hit@3** | | **5/5** | **4/5** | 4/5 *(ngẫu nhiên)* | 0/5 *(ngẫu nhiên)* |
+| | **Điểm truy xuất (/10)** | | **10** | **8** | — | — |
+
+*Ghi chú cách đọc:* với Phó Hiếu Anh, ✅ top-1 nghĩa là **tài liệu** hạng 1 đúng tài liệu gold ở cả 5 câu; ở mức **chunk** thì MRR@3 = 0.90, Grounded@3 = 1.00. Hai cột mock được in nhạt có chủ ý — chúng **không phải thước đo chất lượng**, chỉ có mặt để làm đường cơ sở ngẫu nhiên.
+
+**Bốn điều bảng này nói ra mà từng báo cáo riêng lẻ không nói được:**
+
+1. **Q4 là ca lỗi THẬT của cả nhóm, không phải lỗi của riêng ai.** Ban đầu nhóm tưởng Q4 trượt vì `Bench.py` khai `target_doc_id = "k4-prohibited-products"` trong khi id thật là `shopee-prohibited-products-policy` (đã sửa ở commit `edb85ba`). **Nhưng Hoàng Trọng Đại sửa id rồi chạy lại bằng OpenAI embedder thì Q4 vẫn trượt cả top-3.** Vậy đây là lỗi truy xuất thật, đã loại được cả nguyên nhân "do mock" lẫn "do nhãn sai". Nguyên nhân bạn ấy chỉ ra: `tiki-seller-rights-obligations` có **câu tổng quát** "không được kinh doanh hàng hóa bị cấm", còn tài liệu gold chứa **danh mục cụ thể** (súng, ma túy, hàng giả…); câu hỏi diễn đạt chung chung nên embedding kéo về phía câu tổng quát. Đây là ứng viên chính cho Bài 3.5 của nhóm.
+2. **Cột của Nguyễn Xuân Đức toàn ❌ nhưng cột "câu trả lời của Agent" trong báo cáo bạn ấy lại toàn đúng** — vì hàm LLM giả lập bắt theo từ khóa câu hỏi chứ không đọc ngữ cảnh truyền vào. Cảnh báo phương pháp cho cả nhóm: **chấm RAG phải chấm trên chunk truy xuất được, không chấm trên câu trả lời sinh ra.**
+3. **Hai lần chạy bằng embedder thật cho kết quả gần nhau (5/5 và 4/5) dù dùng hai mô hình khác nhau và hai chiến lược chunking khác nhau** — trong khi hai lần chạy mock chênh nhau 4/5 vs 0/5. Biên độ do *ngẫu nhiên* lớn hơn biên độ do *chiến lược*: dấu hiệu kinh điển rằng bộ benchmark 5 câu này **quá nhỏ để xếp hạng** các chiến lược tốt.
+4. **Chỉ Hit@3 thôi thì corpus B không phân biệt được hai người dùng embedder thật.** Phải thêm Grounded@3 (đúng tài liệu *và* đúng đoạn chứa dữ kiện) mới thấy khác biệt — chi tiết ở Phần 2, mục "Kiểm chứng chéo".
 
 **Lọc bằng metadata có giúp ích không? Ở câu hỏi nào?**
 
@@ -262,6 +395,10 @@ Có, nhưng **không đều** — và chỗ không đều mới là điều đá
 2. **Embedding đo *cách viết*, không đo *ý nghĩa số học*.** Cặp "15 ngày" vs "30 ngày" đạt cosine **0.8898** và "dưới 10km" vs "xa hơn 10km" đạt **0.8622** — cao hơn hẳn hai câu diễn đạt lại thật sự cùng ý (0.6617 / 0.5531). Đây chính là nguyên nhân gốc của lỗi ở Q3.
 3. **Metadata filter là lưới an toàn cho chunking kém, không phải nguồn lợi ích độc lập** — nó cứu `fixed_500_50` khỏi Hit@3=0 ở Q5, nhưng không thêm gì cho `policy_contextual` ở Q2. Trên corpus B, lọc **không đổi kết quả của bất kỳ chiến lược nào** vì câu hỏi đã chứa sẵn từ "người bán".
 4. **Kiểm chứng chéo trên corpus thứ hai đổi hẳn kết luận.** `fixed_500_50` đạt 1.00/1.00/1.00 ở corpus B — nếu chỉ thử một bộ dữ liệu, nhóm đã kết luận baseline đơn giản nhất là đủ tốt.
+5. **Embedder là nút thắt — và nhóm chứng minh được bằng phép tách đúng một biến.** Hoàng Trọng Đại giữ nguyên `RecursiveChunker(400)`, nguyên corpus, nguyên 5 câu hỏi, **chỉ đổi** `MockEmbedder` → `OpenAI text-embedding-3-small`: Hit@1 nhảy từ **0/5 lên 4/5**. Đây là bằng chứng nhân quả, khác hẳn với việc so điểm giữa hai thành viên đang khác nhau nhiều thứ cùng lúc.
+6. **"Câu trả lời đúng" không chứng minh "retrieval đúng".** Báo cáo của Nguyễn Xuân Đức có 0/5 chunk liên quan nhưng 5/5 câu trả lời đúng, vì hàm LLM giả lập bắt theo từ khóa của câu hỏi. Đây là dạng lỗi đánh giá dễ mắc nhất trong RAG và nhóm sẽ demo trực tiếp bằng ca này.
+7. **Đọc chéo code bắt được lỗi mà 42/42 test xanh vẫn bỏ lọt.** Hoàng Trọng Đại phát hiện `delete_document` trên một nhánh lọc theo `record["id"]`, nên khi chạy qua pipeline thật (`ingest` sinh chunk-id `"doc::chunk_0"`, `doc_id` nằm trong metadata) thì **không xóa được gì** — trong khi `tests/test_solution.py` vẫn xanh vì test gốc gọi thẳng `add_documents()`. Bài học: **bộ test được cấp sẵn định nghĩa mức tối thiểu, không định nghĩa "đã đúng".**
+8. **Cùng một cái tên "Hit@3" mà ra hai bảng điểm lệch nhau tới 3/5 câu**, chỉ vì một bên so với một `target_doc_id` còn một bên so với tập `gold_doc_ids`, và vì một bên còn giữ nhãn gold sai ở Q4. Muốn so điểm trong nhóm thì phải chốt **cùng file benchmark**, không chỉ chốt cùng 5 câu hỏi.
 
 ### Phân tích lỗi (Failure Analysis — Bài tập 3.5)
 
@@ -288,7 +425,11 @@ Có, nhưng **không đều** — và chỗ không đều mới là điều đá
 
 **Bài học rút ra khi so sánh trong nhóm:**
 
-Cùng 9 tài liệu và cùng 5 câu hỏi, khoảng cách giữa chiến lược tệ nhất và tốt nhất là Hit@3 0.80 → 1.00 và MRR 0.60 → 0.87 — tức là **chiến lược chia nhỏ quyết định chất lượng nhiều hơn việc "code có chạy không"**. Đáng chú ý hơn: `recursive_500` có Grounded@3 **thấp nhất** (0.80) dù là chiến lược được khuyến nghị mặc định trong hầu hết tài liệu về RAG — vì corpus này có nhiều **bảng bị làm phẳng khi crawl**, mà recursive lại cắt theo đoạn văn nên tách mức phí khỏi tên nhóm sản phẩm. Bài học: không có chiến lược "tốt nhất" phổ quát, chỉ có chiến lược khớp với **cấu trúc thật** của tài liệu.
+**a) So sánh giữa bốn thành viên: nút thắt là embedder, và nhóm chỉ biết chắc điều đó sau khi tách đúng một biến.** Trên bộ câu hỏi chung, bốn người ra 5/5, 4/5, 4/5 và 0/5 — nhưng **không thể** đọc thẳng bảng đó thành thứ hạng chiến lược, vì hai người dùng embedder thật còn hai người dùng mock. Phép đo kết luận được là của Hoàng Trọng Đại: giữ nguyên mọi thứ, chỉ đổi mock → OpenAI, Hit@1 đi từ **0/5 lên 4/5**. Trong khi đó, đổi chiến lược chunking mà giữ nguyên embedder thật chỉ chênh **1 câu** (5/5 vs 4/5), và câu chênh đó (Q4) hóa ra là ca lỗi thật mà **cả embedder thật cũng trượt**. Kết luận thực dụng: **đừng tối ưu chunking trước khi chắc chắn embedder đã đúng.**
+
+**b) Bốn người, bốn cách chấm điểm khác nhau, bốn kết luận khác nhau về cùng một hệ thống.** Trần Tuấn Anh chấm bằng Hit@1/Hit@3 → kết luận "metadata filter là yếu tố quyết định", trong khi số của bạn ấy sinh ra từ mock nên không đỡ được kết luận đó. Nguyễn Xuân Đức chấm bằng câu trả lời của agent → suýt kết luận hệ thống chạy tốt trong khi retrieval sai toàn bộ. Phó Hiếu Anh chấm bằng Hit@3 + MRR@3 + Grounded@3 → thấy Hit@3 bão hòa ở 1.00 trong khi Grounded@3 chênh 0.40–1.00. Hoàng Trọng Đại chấm bằng **cách chạy lại code của cả bốn người trong cùng điều kiện** → phát hiện hai người mô tả chiến lược khác với thứ code thật sự chạy. Bài học lớn nhất của nhóm ở lab này: **chọn sai chỉ số thì đo bao nhiêu lần cũng ra kết luận sai**, và **cách duy nhất bắt được sai lệch giữa "chiến lược đã mô tả" và "chiến lược đã chạy" là chạy lại code của nhau.**
+
+**c) So sánh giữa các chiến lược (trên corpus A).** Cùng 9 tài liệu và cùng 5 câu hỏi, khoảng cách giữa chiến lược tệ nhất và tốt nhất là Hit@3 0.80 → 1.00 và MRR 0.60 → 0.87 — tức là **chiến lược chia nhỏ quyết định chất lượng nhiều hơn việc "code có chạy không"**. Đáng chú ý hơn: `recursive_500` có Grounded@3 **thấp nhất** (0.80) dù là chiến lược được khuyến nghị mặc định trong hầu hết tài liệu về RAG — vì corpus này có nhiều **bảng bị làm phẳng khi crawl**, mà recursive lại cắt theo đoạn văn nên tách mức phí khỏi tên nhóm sản phẩm. Bài học: không có chiến lược "tốt nhất" phổ quát, chỉ có chiến lược khớp với **cấu trúc thật** của tài liệu.
 
 **Nếu làm lại, nhóm sẽ thay đổi gì trong chiến lược dữ liệu (data strategy)?**
 
@@ -300,10 +441,10 @@ Cùng 9 tài liệu và cùng 5 câu hỏi, khoảng cách giữa chiến lượ
 
 ## Tự Đánh Giá (Phần Nhóm)
 
-| Tiêu chí | Điểm tự đánh giá |
-|----------|-------------------|
-| Lựa chọn tài liệu (Document Set Quality) | / 10 |
-| Thiết kế chiến lược (Strategy Design) | / 15 |
-| Chất lượng truy xuất (Retrieval Quality) | / 10 |
-| Thuyết trình (Demo) | / 5 |
-| **Tổng phần nhóm** | **/ 40** |
+| Tiêu chí | Điểm tự đánh giá | Căn cứ |
+|----------|-------------------|--------|
+| Lựa chọn tài liệu (Document Set Quality) | **10** / 10 | 17 tài liệu trên 2 corpus (9 + 8), đều là trang chính sách công khai, tôn trọng `robots.txt` (đã **loại bỏ** TGDĐ/FPT Shop/Sendo vì `Disallow`). Metadata 9 trường có schema khai báo trong `metadata_schema.json` và **được ép tự động** bằng `scripts/validate_metadata.py`; `document_version` trích từ chính nội dung trang, ghi `not-stated` khi trang không công bố thay vì bịa. |
+| Thiết kế chiến lược (Strategy Design) | **15** / 15 | 4 thành viên × 4 chiến lược khác nhau, cộng 5 chiến lược đo song song trên cùng harness, cộng lần đọc chéo chạy lại code của cả 4 nhánh trong cùng điều kiện; tách bạch được **đóng góp riêng của từng cải tiến** (cấu trúc → MRR, ngữ cảnh → Hit/Grounded); kiểm chứng chéo trên corpus thứ hai; và báo cáo một **kết quả âm** (hybrid BM25+RRF qua 3 vòng lặp) kèm nguyên nhân đo được thay vì giấu đi. |
+| Chất lượng truy xuất (Retrieval Quality) | **9** / 10 | Bộ câu hỏi chung: 5/5 Hit@3 với `policy_contextual`, nhưng theo `docs/SCORING.md` thì trên **bộ mở rộng corpus A** vẫn còn Q1 và Q3 chưa đạt top-1 (8/10). Lấy mức trung thực giữa hai bộ; đồng thời tự trừ vì bộ benchmark chung còn lỗi `doc_id` ở Q4 mà nhóm phát hiện muộn. |
+| Thuyết trình (Demo) | **5** / 5 | 6 insight đều dựa trên số liệu đo được, trong đó 3 phân tích lỗi có bằng chứng cụ thể (chunk nguyên văn, toán tử `=<` vs `>`), và một thí nghiệm đối chứng về embedder xuất hiện tự nhiên từ chính nhóm. |
+| **Tổng phần nhóm** | **39 / 40** | |

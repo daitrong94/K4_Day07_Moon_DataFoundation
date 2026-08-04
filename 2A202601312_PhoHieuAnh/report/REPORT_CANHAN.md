@@ -1,8 +1,8 @@
 # Báo Cáo Cá Nhân — Lab 7: Embedding & Vector Store
 
-**Họ tên:** [Tên sinh viên]
-**Nhóm:** [Tên nhóm]
-**Ngày:** [Ngày nộp]
+**Họ tên:** Phó Hiếu Anh — MSSV 2A202601312
+**Nhóm:** K4-Moon (Phó Hiếu Anh · Trần Tuấn Anh · Nguyễn Xuân Đức · Hoàng Trọng Đại )
+**Ngày:** 2026-08-04
 
 > **Nộp 1 bản / sinh viên.** Phần nhóm (lựa chọn tài liệu, thiết kế chiến lược, bộ câu hỏi đánh giá, demo) nộp chung 1 bản trong `REPORT_NHOM.md`. Chi tiết thang điểm: `docs/SCORING.md`.
 
@@ -166,7 +166,9 @@ Kết quả củng cố kết luận ở báo cáo nhóm: mọi chiến lược 
 | Giữ nguyên `k4-prohibited-products` | 0.80 |
 | Sửa thành `shopee-prohibited-products-policy` | **1.00** |
 
-Đã báo lại cho nhóm để sửa `Bench.py`. Đây cũng là lý do tôi thêm `scripts/validate_metadata.py`: nếu `doc_id` trong bộ benchmark được đối chiếu tự động với corpus thì lỗi này lộ ra ngay.
+Đã báo lại cho nhóm; **Hoàng Trọng Đại đã sửa trên nhánh `main`** (commit `edb85ba`, đổi `target_doc_id` thành `shopee-prohibited-products-policy`). Đây cũng là lý do tôi thêm `scripts/validate_metadata.py`: nếu `doc_id` trong bộ benchmark được đối chiếu tự động với corpus thì lỗi này lộ ra ngay.
+
+**Nhưng sửa nhãn xong Q4 vẫn trượt** — và đó mới là phần đáng học. Hoàng Trọng Đại chạy lại bộ đã sửa bằng `OpenAIEmbedder` thật: Q4 **vẫn không lọt top-3**. Vậy Q4 là ca lỗi truy xuất thật, đã loại được cả hai nghi phạm dễ đổ lỗi nhất ("do nhãn sai", "do mock"). Nguyên nhân: `tiki-seller-rights-obligations` chứa **câu tổng quát** "không được kinh doanh hàng hóa bị cấm", còn tài liệu gold chứa **danh mục cụ thể** (súng, ma túy, hàng giả…) — câu hỏi hỏi chung chung nên embedding thấy câu tổng quát "giống" hơn. Đây đúng là dạng lỗi mà `PolicySectionChunker` + tiền tố ngữ cảnh của tôi xử lý được (chunk danh mục được gắn nhãn `[… | prohibited | seller]` nên tự khai báo chủ đề), và cũng là lý do harness của tôi cho Q4 đạt trong khi hai harness kia trượt.
 
 **Điều hay nhất tôi học được từ thành viên khác / nhóm khác (qua demo):**
 
@@ -174,17 +176,27 @@ Kết quả củng cố kết luận ở báo cáo nhóm: mọi chiến lược 
 >
 > Ngược lại, chạy bộ câu hỏi của bạn ấy bằng harness của tôi cho thấy Hit@1/Hit@3 **chưa đủ**: cả 5 chiến lược đều Hit@3 = 1.00, nhìn vào thì tưởng chiến lược nào cũng như nhau, trong khi Grounded@3 dao động từ 0.40 đến 1.00. Kết hợp cả hai — Hit@1 của bạn ấy và Grounded@3 của tôi — mới đủ để kết luận.
 
+> **Từ báo cáo của Nguyễn Xuân Đức:** bạn ấy chạy toàn bộ benchmark bằng `MockEmbedder` và thu được **0/5** — một kết quả thoạt nhìn là "hỏng", nhưng thực ra là **thí nghiệm đối chứng (control) tốt nhất mà nhóm có**. Nó chứng minh bằng số liệu rằng phần retrieval của lab **không** đến từ chunking hay từ metadata, mà đến từ chất lượng mô hình nhúng: cùng corpus, cùng `RecursiveChunker`, cùng bộ lọc metadata, chỉ thay embedder thì Hit@3 rơi từ 1.00 xuống 0.00.
+>
+> Chi tiết đắt giá nhất trong báo cáo của bạn ấy là mục *Grounding*: agent vẫn **in ra câu trả lời đúng** dù cả 5 chunk truy xuất được đều lệch chủ đề — vì hàm LLM giả lập bắt theo từ khóa của câu hỏi chứ không đọc ngữ cảnh. Đây đúng là cái bẫy tôi suýt mắc: nếu chỉ đọc cột "Câu trả lời của Agent" để tự chấm, tôi đã kết luận hệ thống chạy tốt. **Câu trả lời đúng không chứng minh retrieval đúng** — phải chấm trên chunk truy xuất được, chứ không chấm trên output. Đó là lý do tôi thêm cột `Grounded@3` (kiểm tra `gold_keywords` có thật sự nằm trong chunk hay không) thay vì tin vào câu trả lời sinh ra.
+
+> **Từ `SO_SANH_NHOM.md` của Hoàng Trọng Đại — điều tôi học được nhiều nhất ở lab này:** thay vì đọc số liệu mỗi người tự báo cáo, bạn ấy **trích code từng nhánh ra package riêng bằng `git show <branch>:src/*.py` rồi chạy lại tất cả trong cùng một điều kiện**. Cách làm đó bắt được hai thứ mà đọc báo cáo không bao giờ thấy: (a) `Bench.py` mô tả dùng `RecursiveChunker` nhưng thực tế chạy `FixedSizeChunker` mặc định vì quên truyền tham số; (b) một cài đặt `delete_document` lọc theo `record["id"]` nên **không xóa được gì** khi đi qua pipeline thật, dù `tests/test_solution.py` vẫn xanh 42/42.
+>
+> Điều này sửa một giả định sai của chính tôi: tôi từng coi "42/42 test pass" là bằng chứng code đúng, nên phần *Hoàn thiện code* trong báo cáo này tôi viết rất tự tin. Ca `delete_document` cho thấy bộ test được cấp sẵn chỉ định nghĩa **mức tối thiểu**, không định nghĩa "đã đúng" — nó gọi thẳng `add_documents()` với `Document.id == doc_id`, nên không bao giờ đi qua đường sinh chunk-id `"doc::chunk_0"` của `ingest.py`. Cài đặt của tôi may mà đúng vì tôi lọc theo `metadata['doc_id']`, nhưng **tôi đúng do lý do khác chứ không phải do đã kiểm chứng** — nếu không đọc báo cáo của bạn ấy thì tôi không biết mình vừa thoát một cái bẫy.
+>
+> Bạn ấy cũng là người duy nhất chạy được embedder thật trên corpus chung (`text-embedding-3-small`), và đó là phép đo tách biến sạch nhất nhóm có: giữ nguyên chunking, chỉ đổi mock → OpenAI, Hit@1 đi từ 0/5 lên 4/5.
+
 > Việc so sánh 5 chiến lược trên **cùng** corpus cho thấy điều mà chạy riêng một chiến lược không bao giờ thấy được: `recursive_500` — chiến lược được coi là mặc định tốt nhất trong hầu hết tài liệu về RAG — lại có Grounded@3 **thấp nhất** trên corpus này (0.80). Lý do rất cụ thể: tài liệu của nhóm có nhiều bảng bị làm phẳng khi crawl, và recursive cắt theo đoạn văn nên tách mức phí khỏi tên nhóm sản phẩm. Bài học tôi rút ra là **đừng chọn chiến lược theo danh tiếng, hãy chọn theo cấu trúc thật của tài liệu** — và muốn biết cấu trúc thật thì phải mở file crawl ra đọc, chứ không đọc mỗi số liệu tổng hợp.
 
 ---
 
 ## Tự Đánh Giá (Phần Cá Nhân)
 
-| Tiêu chí | Điểm tự đánh giá |
-|----------|-------------------|
-| Khởi động (Warm-up) | / 5 |
-| Hướng tiếp cận của tôi (My Approach) | / 10 |
-| Hoàn thiện code (Core Implementation — tests) | / 30 |
-| Dự đoán độ tương tự (Similarity Predictions) | / 5 |
-| Kết quả truy xuất của tôi (Competition Results) | / 10 |
-| **Tổng phần cá nhân** | **/ 60** |
+| Tiêu chí | Điểm tự đánh giá | Căn cứ |
+|----------|-------------------|--------|
+| Khởi động (Warm-up) | **5** / 5 | Cả hai bài tập đều có phép tính trình bày đầy đủ và **kiểm chứng lại bằng code trong repo** (`len(FixedSizeChunker(500,50).chunk("a"*10000)) == 23`), số liệu cosine là đo thật chứ không ước lượng. |
+| Hướng tiếp cận của tôi (My Approach) | **10** / 10 | Giải thích đủ 5 thành phần trong `src`, nêu rõ base case / edge case, và ghi lại **các quyết định đi chệch khung đề kèm lý do** (`_use_chroma=False`, không dùng dict theo `id`, pre-filter thay vì post-filter). |
+| Hoàn thiện code (Core Implementation — tests) | **30** / 30 | **42/42** test pass (`pytest tests/ -q`), cộng 28 unit test bổ sung cho `src/hybrid.py`. |
+| Dự đoán độ tương tự (Similarity Predictions) | **5** / 5 | 5 cặp đo bằng embedder thật (`AITeamVN/Vietnamese_Embedding`), dự đoán ghi **trước khi chạy**, và phần phản ngẫm nối được kết quả bất ngờ với ca lỗi Q3 trong benchmark. |
+| Kết quả truy xuất của tôi (Competition Results) | **8** / 10 | Hit@3 = 5/5, nhưng theo `docs/SCORING.md` thì Q1 và Q3 chỉ được 1 điểm vì chunk liên quan **không ở top-1** (2+1+1+2+2 = 8). Tự trừ điểm thay vì làm tròn lên. |
+| **Tổng phần cá nhân** | **58 / 60** | |
